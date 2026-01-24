@@ -20,6 +20,12 @@ const { File } = require('megajs');
 // 🔥 USER REPO SUPPORT CONFIG
 const config = require(process.cwd() + "/config.js");
 
+// 🔥 FIREBASE SETTINGS BRIDGE
+const { getSetting, setSetting, resetUser } = require('./lib/settings');
+
+// 🔥 SETTINGS PANEL SESSION (REPLY ISOLATION)
+const settingsSession = {};
+
 const { sms, downloadMediaMessage } = require('./lib/msg');
 const {
   getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson
@@ -33,7 +39,7 @@ const MASTER_SUDO = ['94726880784'];
 
 const app = express();
 const port = process.env.PORT || 8000;
-const prefix = config.PREFIX || '.';
+let prefix = config.PREFIX || '.';
 const credsPath = path.join(__dirname, '/auth_info_baileys/creds.json');
 
 // ===== ANTI DELETE PLUGIN =====
@@ -120,7 +126,7 @@ async function connectToWA() {
         console.log("⚠️ Channel already followed / failed");
       }
 
-      // ===== PLUGIN AUTO LOADER (CORE SAFE) =====
+      // ===== PLUGIN AUTO LOADER =====
       const pluginPath = path.join(__dirname, "plugins");
       fs.readdirSync(pluginPath).forEach((plugin) => {
         if (plugin.endsWith(".js")) {
@@ -158,8 +164,11 @@ async function connectToWA() {
     const isOwner = ownerNumber.includes(senderNumber) || isMe;
     const isSudo = MASTER_SUDO.includes(senderNumber);
 
+    // 🔥 DYNAMIC SETTINGS FROM FIREBASE
+    prefix = await getSetting(sender, "PREFIX") || prefix;
+    const mode = (await getSetting(sender, "MODE") || config.MODE || "public").toLowerCase();
+
     // ===== MODE FIREWALL =====
-    const mode = (config.MODE || "public").toLowerCase();
     if (mode === "group" && !isGroup) return;
     if (mode === "inbox" && isGroup) return;
     if (mode === "private" && !(isOwner || isSudo)) return;
@@ -188,11 +197,11 @@ async function connectToWA() {
 
     // ===== STATUS SYSTEM =====
     if (mek.key.remoteJid === 'status@broadcast') {
-      if (config.AUTO_STATUS_SEEN) {
+      if (await getSetting(sender, "AUTO_STATUS_SEEN")) {
         try { await ranuxPro.readMessages([mek.key]); } catch {}
       }
 
-      if (config.AUTO_STATUS_REACT && mek.key.participant) {
+      if (await getSetting(sender, "AUTO_STATUS_REACT") && mek.key.participant) {
         const emojis = ['❤️','🔥','😎','💯','🥰','🌸','🖤'];
         const randomEmoji = emojis[Math.floor(Math.random()*emojis.length)];
         try {
@@ -202,7 +211,7 @@ async function connectToWA() {
         } catch {}
       }
 
-      if (config.AUTO_STATUS_FORWARD) {
+      if (await getSetting(sender, "AUTO_STATUS_FORWARD")) {
         if (mek.message?.imageMessage || mek.message?.videoMessage) {
           const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
           const mediaMsg = mek.message[msgType];
@@ -252,6 +261,36 @@ async function connectToWA() {
       }
     }
 
+    // ===== SETTINGS PANEL NUMBER REPLY (ISOLATED) =====
+    replyHandlers.push({
+      filter: (body, { sender }) =>
+        settingsSession[sender] &&
+        /^([1-4])\s+(.+)$/i.test(body),
+
+      async function(bot, mek, m, { body, sender, reply }) {
+        const [num, val] = body.split(" ");
+
+        if (num === "1") {
+          await setSetting(sender, "ANTI_DELETE", val === "on");
+          reply(`🛡 Anti Delete set to ${val.toUpperCase()}`);
+        }
+        if (num === "2") {
+          await setSetting(sender, "AUTO_STATUS_SEEN", val === "on");
+          reply(`👁 Status Seen set to ${val.toUpperCase()}`);
+        }
+        if (num === "3") {
+          await setSetting(sender, "MODE", val);
+          reply(`⚙️ Mode set to ${val.toUpperCase()}`);
+        }
+        if (num === "4") {
+          await setSetting(sender, "PREFIX", val);
+          reply(`🔤 Prefix changed to: ${val}`);
+        }
+
+        delete settingsSession[sender];
+      }
+    });
+
     // ===== REPLY HANDLERS =====
     for (const handler of replyHandlers) {
       if (handler.filter(body, { sender, message: mek })) {
@@ -267,7 +306,7 @@ async function connectToWA() {
     }
 
     // ===== ANTI DELETE HOOK =====
-    if (config.ANTI_DELETE && global.pluginHooks) {
+    if (await getSetting(sender, "ANTI_DELETE") && global.pluginHooks) {
       for (const plugin of global.pluginHooks) {
         if (plugin.onMessage) {
           try { await plugin.onMessage(ranuxPro, mek); } catch {}
@@ -278,7 +317,8 @@ async function connectToWA() {
 
   // ===== DELETE EVENT =====
   ranuxPro.ev.on('messages.update', async (updates) => {
-    if (config.ANTI_DELETE && global.pluginHooks) {
+    const sender = updates[0]?.key?.participant || updates[0]?.key?.remoteJid;
+    if (await getSetting(sender, "ANTI_DELETE") && global.pluginHooks) {
       for (const plugin of global.pluginHooks) {
         if (plugin.onDelete) {
           try { await plugin.onDelete(ranuxPro, updates); } catch {}
