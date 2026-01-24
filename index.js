@@ -17,17 +17,18 @@ const path = require('path');
 const qrcode = require('qrcode-terminal');
 const { File } = require('megajs');
 
-// 🔥 USER REPO SUPPORT CONFIG
+// 🔥 USER CONFIG
 const config = require(process.cwd() + "/config.js");
 
 const { sms, downloadMediaMessage } = require('./lib/msg');
 const {
-  getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson
+  getBuffer, getGroupAdmins, getRandom, h2k, isUrl,
+  Json, runtime, sleep, fetchJson
 } = require('./lib/functions');
 
 const { commands, replyHandlers } = require('./command');
 
-// ===== OWNER SYSTEM (OLD BASE) =====
+// ===== OWNER SYSTEM =====
 const ownerNumber = ['94726880784'];
 const MASTER_SUDO = ['94726880784'];
 
@@ -168,6 +169,12 @@ async function connectToWA() {
   // ================= MESSAGE HANDLER =================
   ranuxPro.ev.on('messages.upsert', async ({ messages }) => {
 
+    for (const msg of messages) {
+      if (msg.messageStubType === 68) {
+        await ranuxPro.sendMessageAck(msg.key);
+      }
+    }
+
     const mek = messages[0];
     if (!mek || !mek.message) return;
 
@@ -204,66 +211,55 @@ async function connectToWA() {
     const args = body.trim().split(/ +/).slice(1);
     const q = args.join(' ');
 
+    const groupMetadata = isGroup ? await ranuxPro.groupMetadata(from).catch(() => {}) : '';
+    const participants = isGroup ? groupMetadata.participants : '';
+    const groupAdmins = isGroup ? await getGroupAdmins(participants) : '';
+    const botNumber2 = await jidNormalizedUser(ranuxPro.user.id);
+    const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false;
+    const isAdmins = isGroup ? groupAdmins.includes(sender) : false;
+
     const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
-    // ================= STATUS SYSTEM (FIXED) =================
+    // ================= STATUS SYSTEM =================
     const isStatus = mek.key.remoteJid === 'status@broadcast';
 
     if (isStatus) {
 
-      // AUTO STATUS SEEN
       if (config.AUTO_STATUS_SEEN) {
-        try {
-          await ranuxPro.readMessages([mek.key]);
-          console.log("👁 Status seen:", mek.key.id);
-        } catch (e) {
-          console.log("Status seen error:", e.message);
-        }
+        try { await ranuxPro.readMessages([mek.key]); } catch {}
       }
 
-      // AUTO STATUS REACT
       if (config.AUTO_STATUS_REACT && mek.key.participant) {
-        const emojis = ['','💝','😎','💯','🫶',];
+        const emojis = ['❤️','🔥','😎','💯','🥰','🌸','🖤','🫶'];
         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
         try {
           await ranuxPro.sendMessage(mek.key.participant, {
             react: { text: randomEmoji, key: mek.key }
           });
-          console.log("💬 Reacted to status");
-        } catch (e) {
-          console.log("Status react error:", e.message);
-        }
+        } catch {}
       }
 
-      // AUTO STATUS FORWARD
       if (config.AUTO_STATUS_FORWARD) {
         if (mek.message?.imageMessage || mek.message?.videoMessage) {
-          try {
-            const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
-            const mediaMsg = mek.message[msgType];
+          const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
+          const mediaMsg = mek.message[msgType];
 
-            const stream = await downloadContentFromMessage(
-              mediaMsg,
-              msgType === "imageMessage" ? "image" : "video"
-            );
+          const stream = await downloadContentFromMessage(
+            mediaMsg,
+            msgType === "imageMessage" ? "image" : "video"
+          );
 
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream)
-              buffer = Buffer.concat([buffer, chunk]);
+          let buffer = Buffer.from([]);
+          for await (const chunk of stream)
+            buffer = Buffer.concat([buffer, chunk]);
 
-            await ranuxPro.sendMessage(botNumber + "@s.whatsapp.net", {
-              [msgType === "imageMessage" ? "image" : "video"]: buffer,
-              caption: `📥 Forwarded Status`
-            });
-
-            console.log("📤 Status forwarded");
-
-          } catch (e) {
-            console.log("Status forward error:", e.message);
-          }
+          await ranuxPro.sendMessage(botNumber + "@s.whatsapp.net", {
+            [msgType === "imageMessage" ? "image" : "video"]: buffer,
+            caption: `📥 Forwarded Status from @${senderNumber}`,
+            mentions: [senderNumber + "@s.whatsapp.net"]
+          });
         }
       }
-
       return;
     }
 
@@ -273,15 +269,37 @@ async function connectToWA() {
         c.pattern === commandName || (c.alias && c.alias.includes(commandName))
       );
       if (cmd) {
+        if (cmd.react)
+          ranuxPro.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+
         try {
           cmd.function(ranuxPro, mek, m, {
             from, quoted: mek, body,
             command: commandName, args, q,
             isGroup, sender, senderNumber,
-            isOwner, reply
+            botNumber2, botNumber, pushname,
+            isMe, isOwner,
+            groupMetadata,
+            participants, groupAdmins,
+            isBotAdmins, isAdmins,
+            reply,
           });
         } catch (e) {
           console.error("[PLUGIN ERROR]", e);
+        }
+      }
+    }
+
+    // ================= REPLY HANDLERS =================
+    for (const handler of replyHandlers) {
+      if (handler.filter(body, { sender, message: mek })) {
+        try {
+          await handler.function(ranuxPro, mek, m, {
+            from, quoted: mek, body, sender, reply,
+          });
+          break;
+        } catch (e) {
+          console.log("Reply handler error:", e);
         }
       }
     }
