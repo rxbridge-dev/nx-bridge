@@ -8,46 +8,61 @@ cmd({
   filename: __filename
 }, async (ranuxPro, mek, m, { from, sender, isGroup, quoted }) => {
 
-  let targetJid = "";
+  let result = "";
   let title = "";
 
-  // Reply කරලා තියෙනවනම්
+  // 1️⃣ Reply case
   if (quoted && quoted.sender) {
-    targetJid = quoted.sender;
+    result = quoted.sender;
     title = "👤 Replied User JID";
   }
-  // Mention කරලා තියෙනවනම්
+
+  // 2️⃣ Mention case (support multiple)
   else if (mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length) {
-    targetJid = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
-    title = "👥 Mentioned User JID";
+    const list = mek.message.extendedTextMessage.contextInfo.mentionedJid;
+    result = list.join("\n");
+    title = "👥 Mentioned User JID(s)";
   }
-  // Group එකක් ඇතුලේ නම්
+
+  // 3️⃣ Group
   else if (isGroup) {
-    targetJid = from;
+    result = from;
     title = "👨‍👩‍👧‍👦 Group JID";
   }
-  // Channel / broadcast
-  else if (from === "status@broadcast") {
-    targetJid = from;
+
+  // 4️⃣ Channel
+  else if (from.endsWith("@newsletter")) {
+    result = from;
     title = "📢 Channel JID";
   }
-  // Private chat
+
+  // 5️⃣ Private chat
   else {
-    targetJid = sender;
+    result = sender;
     title = "🧑 Your JID";
   }
 
   const text = `
-🆔 𝗝𝗜𝗗 𝗜𝗡𝗙𝗢
-━━━━━━━━━━━━━━
+╔══════════════════════╗
+   🆔 *KING RANUX PRO*
+        JID PANEL
+╚══════════════════════╝
+
 ${title}
 
-📄 ${targetJid}
-━━━━━━━━━━━━━━
+📄 JID:
+${result}
+
+━━━━━━━━━━━━━━━━━━
+Tips:
+• Reply → get replied user JID
+• Mention → get mentioned JID(s)
+• Group → shows group JID
+• Channel → shows channel JID
+━━━━━━━━━━━━━━━━━━
+
+> King RANUX PRO
 `;
 
-  await ranuxPro.sendMessage(from, {
-    text: text.trim()
-  }, { quoted: mek });
-
+  await ranuxPro.sendMessage(from, { text }, { quoted: mek });
 });
