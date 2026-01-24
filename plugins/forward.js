@@ -5,7 +5,6 @@ module.exports = {
   category: "tools",
   async run({ m, reply, args, bot }) {
 
-    // UI helper
     const panel = (text) => reply(
 `╔══════════════════════╗
    🔁 *KING RANUX PRO*
@@ -23,9 +22,8 @@ Reply to a message and type:
 Examples:
 .forward 94726880784@s.whatsapp.net
 .forward 9477xxxxxx-12345@g.us
-.forward 0029VbC5zjdAojYzyAJS7U2S@newsletter
-━━━━━━━━━━━━━━━━━━
-`
+.forward 120363405950699484@newsletter
+━━━━━━━━━━━━━━━━━━`
     );
 
     if (!m.quoted) {
@@ -36,22 +34,27 @@ Examples:
       return panel("❌ *No target JID given!*\n\nPlease provide a target JID.");
     }
 
-    const target = args[0];
+    const target = args[0].trim();
 
     try {
-      await bot.forwardMessage(target, m.quoted, { force: true });
+      await bot.forwardMessage(
+        target,
+        m.quoted,
+        { force: true }
+      );
 
       reply(
 `╔══════════════════════╗
    ✅ *FORWARD SUCCESS*
 ╚══════════════════════╝
 
-📤 Message forwarded to:
+📤 Forwarded To:
 ${target}
 
-📦 Type: ${m.quoted.mtype || "unknown"}
+📦 Message Type:
+${m.quoted.mtype || "unknown"}
 
-> King RANUX PRO`
+👑 King RANUX PRO`
       );
 
     } catch (e) {
@@ -61,12 +64,10 @@ ${target}
    ❌ *FORWARD FAILED*
 ╚══════════════════════╝
 
-Something went wrong while forwarding.
-
 Reason:
 ${e.message || "Unknown error"}
 
-> King RANUX PRO`
+👑 King RANUX PRO`
       );
     }
   }
