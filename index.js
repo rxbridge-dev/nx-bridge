@@ -17,7 +17,9 @@ const path = require('path');
 const qrcode = require('qrcode-terminal');
 const { File } = require('megajs');
 
-const config = require("../config");
+// 🔥 USER REPO SUPPORT CONFIG
+const config = require(process.cwd() + "/config.js");
+
 const { sms, downloadMediaMessage } = require('./lib/msg');
 const {
   getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson
@@ -25,7 +27,7 @@ const {
 
 const { commands, replyHandlers } = require('./command');
 
-// ===== OWNER SYSTEM (OLD BASE + EXTENDED) =====
+// ===== OWNER SYSTEM (OLD BASE) =====
 const ownerNumber = ['94726880784'];
 const MASTER_SUDO = ['94726880784'];
 
@@ -34,33 +36,31 @@ const port = process.env.PORT || 8000;
 const prefix = config.PREFIX || '.';
 const credsPath = path.join(__dirname, '/auth_info_baileys/creds.json');
 
-// ===== ANTI DELETE PLUGIN (NEW) =====
+// ===== ANTI DELETE PLUGIN =====
 const antiDeletePlugin = require('./plugins/antidelete.js');
 global.pluginHooks = global.pluginHooks || [];
 global.pluginHooks.push(antiDeletePlugin);
 
-// ===== SESSION RESTORE (MEGA) =====
+// ===== SESSION RESTORE =====
 async function ensureSessionFile() {
   if (!fs.existsSync(credsPath)) {
     if (!config.SESSION_ID) {
-      console.error('❌ SESSION_ID env variable is missing. Cannot restore session.');
+      console.error('❌ SESSION_ID env variable is missing.');
       process.exit(1);
     }
 
     console.log("🔄 creds.json not found. Downloading session from MEGA...");
-
-    const sessdata = config.SESSION_ID;
-    const filer = File.fromURL(`https://mega.nz/file/${sessdata}`);
+    const filer = File.fromURL(`https://mega.nz/file/${config.SESSION_ID}`);
 
     filer.download((err, data) => {
       if (err) {
-        console.error("❌ Failed to download session file from MEGA:", err);
+        console.error("❌ Failed to download session:", err);
         process.exit(1);
       }
 
       fs.mkdirSync(path.join(__dirname, '/auth_info_baileys/'), { recursive: true });
       fs.writeFileSync(credsPath, data);
-      console.log("✅ Session downloaded and saved. Restarting bot...");
+      console.log("✅ Session restored. Restarting...");
       setTimeout(() => connectToWA(), 2000);
     });
   } else {
@@ -108,21 +108,23 @@ async function connectToWA() {
       const botJid = ranuxPro.user.id.split(":")[0] + "@s.whatsapp.net";
 
       await ranuxPro.sendMessage(botJid, {
-        image: { url: `https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/king-ranux-pro-main-logo.png` },
+        image: { url: config.ALIVE_IMG },
         caption: up
       });
 
-      // ===== AUTO JOIN OFFICIAL CHANNEL (NEW FEATURE) =====
+      // ===== AUTO JOIN OFFICIAL CHANNEL =====
       try {
         await ranuxPro.newsletterFollow("0029VbC5zjdAojYzyAJS7U2S");
         console.log("✅ Auto joined King RANUX PRO official channel");
       } catch (e) {
-        console.log("⚠️ Channel join failed:", e.message);
+        console.log("⚠️ Channel already followed / failed");
       }
 
-      fs.readdirSync("./plugins/").forEach((plugin) => {
-        if (path.extname(plugin).toLowerCase() === ".js") {
-          require(`./plugins/${plugin}`);
+      // ===== PLUGIN AUTO LOADER (CORE SAFE) =====
+      const pluginPath = path.join(__dirname, "plugins");
+      fs.readdirSync(pluginPath).forEach((plugin) => {
+        if (plugin.endsWith(".js")) {
+          require(path.join(pluginPath, plugin));
         }
       });
     }
@@ -156,7 +158,7 @@ async function connectToWA() {
     const isOwner = ownerNumber.includes(senderNumber) || isMe;
     const isSudo = MASTER_SUDO.includes(senderNumber);
 
-    // ===== MODE FIREWALL (NEW) =====
+    // ===== MODE FIREWALL =====
     const mode = (config.MODE || "public").toLowerCase();
     if (mode === "group" && !isGroup) return;
     if (mode === "inbox" && isGroup) return;
@@ -184,7 +186,7 @@ async function connectToWA() {
 
     const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
-    // ===== STATUS SYSTEM (NEW) =====
+    // ===== STATUS SYSTEM =====
     if (mek.key.remoteJid === 'status@broadcast') {
       if (config.AUTO_STATUS_SEEN) {
         try { await ranuxPro.readMessages([mek.key]); } catch {}
