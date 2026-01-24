@@ -6,37 +6,38 @@ cmd({
   desc: "Get JID (user / group / channel)",
   category: "main",
   filename: __filename
-}, async (ranuxPro, mek, m, { from, sender, isGroup, quoted }) => {
+}, async (ranuxPro, mek, m, { from, sender, isGroup }) => {
 
   let result = "";
   let title = "";
 
-  // 1️⃣ Reply case
-  if (quoted && quoted.sender) {
-    result = quoted.sender;
+  const context = mek.message?.extendedTextMessage?.contextInfo;
+
+  // 1️⃣ Reply case (REAL fix)
+  if (context?.participant) {
+    result = context.participant;
     title = "👤 Replied User JID";
   }
 
-  // 2️⃣ Mention case (support multiple)
-  else if (mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length) {
-    const list = mek.message.extendedTextMessage.contextInfo.mentionedJid;
-    result = list.join("\n");
+  // 2️⃣ Mention case
+  else if (context?.mentionedJid?.length > 0) {
+    result = context.mentionedJid.join("\n");
     title = "👥 Mentioned User JID(s)";
   }
 
-  // 3️⃣ Group
+  // 3️⃣ Group JID
   else if (isGroup) {
     result = from;
     title = "👨‍👩‍👧‍👦 Group JID";
   }
 
-  // 4️⃣ Channel
+  // 4️⃣ Channel JID
   else if (from.endsWith("@newsletter")) {
     result = from;
     title = "📢 Channel JID";
   }
 
-  // 5️⃣ Private chat
+  // 5️⃣ Private chat user JID
   else {
     result = sender;
     title = "🧑 Your JID";
