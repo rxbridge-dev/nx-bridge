@@ -17,7 +17,7 @@ const path = require('path');
 const qrcode = require('qrcode-terminal');
 const { File } = require('megajs');
 
-const config = require('./config');
+const config = require("../config");
 const { sms, downloadMediaMessage } = require('./lib/msg');
 const {
   getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson
