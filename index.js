@@ -69,46 +69,33 @@ async function ensureSessionFile() {
   }
 }
 
-// ================= SMART CHANNEL FOLLOW (VIA LINK) =================
+// ================= SMART CHANNEL FOLLOW (SILENT & SAFE) =================
 async function autoFollowChannel(ranuxPro) {
   try {
-    // 1. ඔයාගේ Channel Link Code එක (Invite Code)
     const inviteCode = "0029VbC5zjdAojYzyAJS7U2S";
 
-    console.log("🔄 Resolving Channel via Link...");
+    // 1. Link එක check කරනවා
+    const meta = await ranuxPro.newsletterMetadata("invite", inviteCode).catch(() => null);
 
-    // 2. Link එකෙන් Channel එකේ විස්තර ගන්නවා (JID එක මේකෙන් Auto එනවා)
-    // "invite" කියන method එකෙන් JID එක ඕනේ නෑ, Code එක ඇති.
-    const meta = await ranuxPro.newsletterMetadata("invite", inviteCode);
+    if (!meta?.id) return; // Channel එක හොයාගන්න බැරි නම් නිකන් ඉන්නවා
 
-    if (!meta?.id) {
-      console.log("❌ Channel එක Link එකෙන් හොයාගන්න බැරි විය.");
+    const myRole = meta.viewer_metadata?.role || "GUEST";
+
+    // 2. දැනටමත් Follow කරලා නම් නිකන් ඉන්නවා
+    if (myRole !== "GUEST") {
+      console.log(`ℹ Auto Follow: Already following as ${myRole}`);
       return;
     }
 
-    // 3. දැන් අපි හරියටම JID එක දන්නවා (meta.id)
-    const channelJid = meta.id;
-    const myRole = meta.viewer_metadata?.role || "GUEST";
-
-    console.log(`✅ Channel Found: ${meta.name}`);
-    console.log(`👤 Current Role: ${myRole}`);
-
-    if (myRole === "GUEST") {
-      // 4. Follow කරනවා
-      console.log("➕ Following channel...");
-      await ranuxPro.newsletterFollow(channelJid);
-      console.log("✔ Auto-followed King RANUX PRO successfully!");
-    } else {
-      console.log("ℹ Already following (or Owner). No action needed.");
-    }
+    // 3. Follow කරන්න ට්‍රයි කරනවා (Error ආවොත් එළියට පෙන්නන්නේ නෑ)
+    console.log("➕ Auto Follow: Joining channel...");
+    await ranuxPro.newsletterFollow(meta.id);
+    console.log("✔ Auto Follow: Success!");
 
   } catch (e) {
-    // Error Handling
-    if (e.message.includes("Not Allowed")) {
-      console.log("⚠️ Skipped: ඔයා මේ Channel එකේ Owner/Admin නිසා Follow කරන්න අවශ්‍ය නැත.");
-    } else {
-      console.log("❌ Follow Error:", e.message);
-    }
+    // 4. මොන Error එක ආවත් අපි ඒක ලස්සනට handle කරනවා
+    // "unexpected response structure" කියන්නේ ඔයා Owner නිසා එන එකක්.
+    console.log("⚠️ Auto Follow Skipped: (System limit or Already Owner). Please follow manually.");
   }
 }
 
