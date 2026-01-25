@@ -32,14 +32,14 @@ cmd(
     react: "🖼️",
     filename: __filename,
   },
-  async (bot, mek, m, { from, reply, isGroup, isAdmin, isOwner, isSudo }) => {
+  async (bot, mek, m, { from, reply, isGroup, isAdmins, isOwner, isSudo }) => {
     try {
-      // Privacy: Admin / Owner / Sudo only in groups
-      if (isGroup && !isAdmin && !isOwner && !isSudo) {
+      // Group privacy
+      if (isGroup && !isAdmins && !isOwner && !isSudo) {
         return reply(
           "❌ *Permission Denied*\n\n" +
-          "මෙම command එක භාවිතා කළ හැක්කේ\n" +
-          "Group Admins / Bot Owner / Sudo Users පමණි."
+          "Group එකක `.getpp` භාවිතා කළ හැක්කේ\n" +
+          "Admins / Owner / Sudo පමණි."
         );
       }
 
@@ -47,12 +47,11 @@ cmd(
       if (isRateLimited(m.sender)) {
         return reply(
           "⏳ *Rate Limit Exceeded*\n\n" +
-          "You can only use `.getpp` 5 times per minute.\n" +
-          "කරුණාකර මිනිත්තු 1ක් බලා නැවත උත්සාහ කරන්න."
+          "5 per minute only.\n" +
+          "මිනිත්තු 1ක් පසු නැවත උත්සාහ කරන්න."
         );
       }
 
-      // Target = the person who sent the message
       const targetJid = m.sender;
 
       await bot.sendMessage(from, {
@@ -64,36 +63,35 @@ cmd(
         ppUrl = await bot.profilePictureUrl(targetJid, "image");
       } catch (e) {
         return reply(
-          "❌ Profile picture not available.\n" +
+          "❌ *Profile picture not available.*\n" +
           "මෙම userගේ DP private හෝ නැත."
         );
       }
 
-      // Get user name
+      // Name (fallback safe)
       let name = targetJid.split("@")[0];
       try {
-        const contact = await bot.getContact(targetJid);
-        if (contact?.name) name = contact.name;
+        const contact = await bot.onWhatsApp(targetJid);
+        if (contact?.[0]?.notify) name = contact[0].notify;
       } catch {}
 
-      // Get about/status
+      // About / status
       let about = "Not available";
       try {
         const status = await bot.fetchStatus(targetJid);
         if (status?.status) about = status.status;
       } catch {}
 
-      // Send image
       await bot.sendMessage(
         from,
         {
           image: { url: ppUrl },
           caption:
-            "🖼️ *PROFILE PICTURE DOWNLOADED*\n\n" +
+            "🖼️ *PROFILE PICTURE RECOVERED*\n\n" +
             "👤 Name: " + name + "\n" +
             "🆔 JID: " + targetJid + "\n" +
             "💬 About: " + about + "\n\n" +
-            "🖼️ *Userගේ Profile Picture එක ලබා ගන්නා ලදි*\n\n" +
+            "📥 *Userගේ DP එක download කරන ලදී*\n\n" +
             "👑 King RANUX PRO",
         },
         { quoted: mek }
