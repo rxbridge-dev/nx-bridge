@@ -64,15 +64,30 @@ ${FOOTER}`
       react: { text: "⏳", key: mek.key }
     });
 
-    // HEAD -> size
+    // ================= FILE SIZE + REAL NAME =================
     let sizeMB = null;
     try {
       const head = await axios.head(finalUrl);
       const size = parseInt(head.headers["content-length"] || 0);
       sizeMB = (size / 1024 / 1024).toFixed(2);
+
+      // real filename from header
+      const disposition = head.headers["content-disposition"];
+      if (disposition && disposition.includes("filename=")) {
+        fileName = disposition
+          .split("filename=")[1]
+          .replace(/"/g, "")
+          .trim();
+      } else {
+        // fallback from URL
+        try {
+          fileName = path.basename(new URL(finalUrl).pathname) || fileName;
+        } catch {}
+      }
+
     } catch {}
 
-    // If > 2GB -> give link only
+    // ================= TOO LARGE =================
     if (sizeMB && sizeMB > 2100) {
       return reply(
 `⚠️ *FILE TOO LARGE*
@@ -88,7 +103,7 @@ ${FOOTER}`
       );
     }
 
-    // Download stream
+    // ================= DOWNLOAD STREAM =================
     const response = await axios({
       url: finalUrl,
       method: "GET",
@@ -101,7 +116,9 @@ ${FOOTER}`
       ? "." + contentType.split("/")[1].split(";")[0]
       : "";
 
-    fileName = fileName + ext;
+    if (!fileName.endsWith(ext)) {
+      fileName = fileName + ext;
+    }
 
     const tempDir = path.join(__dirname, "../temp");
     await fs.ensureDir(tempDir);
