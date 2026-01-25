@@ -69,29 +69,37 @@ async function ensureSessionFile() {
   }
 }
 
-// ================= SMART CHANNEL FOLLOW =================
-// ================= SMART CHANNEL FOLLOW (FIXED) =================
+// ================= SMART CHANNEL FOLLOW (SAFE MODE) =================
 async function autoFollowChannel(ranuxPro) {
   try {
     const channelJid = "120363405950699484@newsletter";
 
-    // 1. Channel එකේ විස්තර ගන්නවා
-    const meta = await ranuxPro.newsletterMetadata("jid", channelJid);
+    // 1. Metadata ගන්න ට්‍රයි කරනවා
+    const meta = await ranuxPro.newsletterMetadata("jid", channelJid).catch(e => null);
 
-    // 2. දැනට ඉන්න තත්ත්වය (Role) බලනවා
-    // meta.viewer_metadata.role කියන එක 'GUEST' නම් අපි තාම follow කරලා නෑ.
+    if (!meta) {
+      console.log("⚠️ Auto Follow: Channel එක හොයාගන්න බෑ (JID වැරදි හෝ Server Busy).");
+      return;
+    }
+
+    // 2. Role එක බලනවා
     const myRole = meta?.viewer_metadata?.role || "GUEST";
 
     if (myRole === "GUEST") {
-      // තාම Guest කෙනෙක් නම් Follow කරනවා
+      // 3. Follow කරන්න ට්‍රයි කරනවා
       await ranuxPro.newsletterFollow(channelJid);
       console.log("✔ Auto-followed King RANUX PRO channel");
     } else {
-      // දැනටමත් Subscriber/Admin කෙනෙක් නම්
-      console.log("ℹ Already following channel (Role: " + myRole + ")");
+      console.log(`ℹ Already connected to channel as: ${myRole}`);
     }
+
   } catch (e) {
-    console.log("Channel follow error:", e.message);
+    // 4. විශේෂ Error Handling (Admin History ප්‍රශ්නය විසඳීම)
+    if (e.message.includes("Not Allowed")) {
+      console.log("⚠️ Auto Follow Skipped: ඔයා කලින් Admin හිටපු නිසා API එකෙන් Follow කරන්න බැහැ. (Phone එකෙන් Manually Follow කරන්න).");
+    } else {
+      console.log("⚠️ Auto Follow Error:", e.message);
+    }
   }
 }
 
