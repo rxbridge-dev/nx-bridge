@@ -1,69 +1,40 @@
 const { cmd } = require("../command");
 
 cmd({
-  pattern: "jid",
-  react: "🆔",
-  desc: "Get JID (user / group / channel)",
-  category: "main",
-  filename: __filename
-}, async (ranuxPro, mek, m, { from, sender, isGroup }) => {
+    pattern: "checkjid",
+    desc: "Get real JID and debug channel",
+    category: "main",
+    filename: __filename
+},
+async (bot, mek, m, { from, reply }) => {
+    if (!m.quoted) return reply("Please reply to a forwarded Channel Message.");
 
-  let result = "";
-  let title = "";
+    try {
+        const context = mek.message?.extendedTextMessage?.contextInfo;
+        const forwardedJid = context?.forwardedNewsletterMessageInfo?.newsletterJid;
+        const name = context?.forwardedNewsletterMessageInfo?.newsletterName;
 
-  const context = mek.message?.extendedTextMessage?.contextInfo;
+        if (forwardedJid) {
+            let msg = `📢 *CHANNEL FOUND!*\n\n`;
+            msg += `📛 Name: ${name}\n`;
+            msg += `🆔 Real JID: \`${forwardedJid}\`\n\n`;
+            
+            // Try to fetch metadata live
+            try {
+                const meta = await bot.newsletterMetadata("jid", forwardedJid);
+                msg += `✅ Bot can see this channel!\n`;
+                msg += `Role: ${meta.viewer_metadata.role}\n`;
+            } catch (e) {
+                msg += `❌ Bot CANNOT see this channel.\n`;
+                msg += `Error: ${e.message}\n`;
+            }
 
-  // 1️⃣ Reply case (REAL fix)
-  if (context?.participant) {
-    result = context.participant;
-    title = "👤 Replied User JID";
-  }
-
-  // 2️⃣ Mention case
-  else if (context?.mentionedJid?.length > 0) {
-    result = context.mentionedJid.join("\n");
-    title = "👥 Mentioned User JID(s)";
-  }
-
-  // 3️⃣ Group JID
-  else if (isGroup) {
-    result = from;
-    title = "👨‍👩‍👧‍👦 Group JID";
-  }
-
-  // 4️⃣ Channel JID
-  else if (from.endsWith("@newsletter")) {
-    result = from;
-    title = "📢 Channel JID";
-  }
-
-  // 5️⃣ Private chat user JID
-  else {
-    result = sender;
-    title = "🧑 Your JID";
-  }
-
-  const text = `
-╔══════════════════════╗
-   🆔 *KING RANUX PRO*
-        JID PANEL
-╚══════════════════════╝
-
-${title}
-
-📄 JID:
-${result}
-
-━━━━━━━━━━━━━━━━━━
-Tips:
-• Reply → get replied user JID
-• Mention → get mentioned JID(s)
-• Group → shows group JID
-• Channel → shows channel JID
-━━━━━━━━━━━━━━━━━━
-
-> King RANUX PRO
-`;
-
-  await ranuxPro.sendMessage(from, { text }, { quoted: mek });
+            return reply(msg);
+        } else {
+            reply("❌ මෙය Channel Message එකක් නොවේ.");
+        }
+    } catch (e) {
+        console.log(e);
+        reply("Unknown Error");
+    }
 });
