@@ -151,6 +151,7 @@ async function connectToWA() {
         connectToWA();
       }
     } else if (connection === 'open') {
+      // ===== CONNECTION OPEN BLOCK =====
       console.log('✅ King RANUX PRO connected');
 
       const botJid = ranuxPro.user.id.split(":")[0] + "@s.whatsapp.net";
@@ -161,7 +162,10 @@ async function connectToWA() {
         caption: panel
       });
 
-      await autoFollowChannel(ranuxPro);
+      // 🔥 FIX: තත්පර 5ක් පරක්කු වෙලා Follow කරන්න (Error එක නවතී)
+      setTimeout(async () => {
+        await autoFollowChannel(ranuxPro);
+      }, 5000); 
 
       // ===== PLUGIN AUTO LOADER =====
       const pluginPath = path.join(__dirname, "plugins");
