@@ -1,5 +1,6 @@
 const { cmd } = require("../command");
 const puppeteer = require("puppeteer");
+const config = require("../config");
 
 const pendingSearch = {};
 const pendingQuality = {};
@@ -177,7 +178,7 @@ cmd({
   `📊 *Quality* : ${selectedLink.quality}\n` +
   `💾 *Size*    : ${selectedLink.size}\n\n` +
   `🍿 Movie එක enjoy කරන්න! Happy watching 😄\n\n` +
-  `> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱`
+  `> ${config.MOVIE_FOOTER_TEXT || "King RANUX PRO"}`
     }, { quoted: mek });
   } catch (error) {
     console.error("Send document error:", error);

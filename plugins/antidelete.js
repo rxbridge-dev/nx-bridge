@@ -10,7 +10,7 @@ if (!fs.existsSync(tempFolder)) {
 const messageStore = new Map();
 const mediaStore = new Map(); 
 
-const CLEANUP_TIME = 10 * 60 * 1000;
+const CLEANUP_TIME = 10 * 60 * 1000; // 10 minutes
 
 function unwrapMessage(message) {
   if (!message) return null;
@@ -57,10 +57,12 @@ module.exports = {
     const cleanMessage = unwrapMessage(msg.message);
     if (!cleanMessage) return;
 
+    // ✅ store message + real timestamp
     messageStore.set(keyId, {
       key: msg.key,
       message: cleanMessage,
-      remoteJid
+      remoteJid,
+      timestamp: msg.messageTimestamp
     });
 
     const type = Object.keys(cleanMessage)[0];
@@ -95,6 +97,7 @@ module.exports = {
       await fs.promises.writeFile(filePath, buffer);
       mediaStore.set(keyId, filePath);
 
+      // auto cleanup
       setTimeout(() => {
         messageStore.delete(keyId);
         if (mediaStore.has(keyId)) {
@@ -126,11 +129,16 @@ module.exports = {
       const from = key.remoteJid;
       const sender = key.participant || from;
 
+      const time = stored.timestamp
+        ? new Date(stored.timestamp * 1000).toLocaleString()
+        : new Date().toLocaleString();
+
       let caption =
-`🗑️ *Deleted Message Recovered*
+`🚮 *Deleted Message Recovered*
 
 👤 *Sender:* @${sender.split('@')[0]}
-🕒 *Time:* ${new Date().toLocaleString()}`;
+🕰️ *Time:* ${time}
+📌 *Status:* Restored Successfully`;
 
       try {
         const mediaPath = mediaStore.get(keyId);
@@ -160,6 +168,7 @@ module.exports = {
           continue;
         }
 
+        // text message recovery
         const msgObj = stored.message;
         let text =
           msgObj.conversation ||

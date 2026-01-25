@@ -7,14 +7,15 @@ const HEADER_IMG = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-A
 
 const FOOTER = `
 ━━━━━━━━━━━━━━━━━━━━━━
-> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱
+👑 King RANUX PRO
+𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱
 ━━━━━━━━━━━━━━━━━━━━━━
 `;
 
 cmd({
   pattern: "menu",
   react: "✨",
-  desc: "Show premium command menu",
+  desc: "Show command menu",
   category: "main",
   filename: __filename
 }, async (ranuxPro, mek, m, { from, sender }) => {
@@ -33,13 +34,13 @@ cmd({
   const categories = Object.keys(commandMap);
 
   let menuText = `
-👑 𝑲𝒊𝒏𝒈 𝑹𝑨𝑵𝑼𝑿 𝑷𝒓𝒐
+👑 KING RANUX PRO
 ━━━━━━━━━━━━━━━━━━━━━━
-✨ 𝗣𝗿𝗲𝗺𝗶𝘂𝗺 𝗠𝗲𝗻𝘂
+✨ PREMIUM COMMAND MENU
 ⚡ Fast • Stable • Powerful
 ━━━━━━━━━━━━━━━━━━━━━━
 
-📂 𝗖𝗮𝘁𝗲𝗴𝗼𝗿𝗶𝗲𝘀
+📂 CATEGORIES
 `;
 
   categories.forEach((cat, i) => {
@@ -54,12 +55,19 @@ cmd({
 
   menuText += `
 ━━━━━━━━━━━━━━━━━━━━━━
-📝 𝗛𝗼𝘄 𝘁𝗼 𝗨𝘀𝗲
+📝 HOW TO USE
 Reply with category number
-Example: 1 or 2 or 3
+
+Example:
+1
+2
+3
 
 💡 Tip:
-Use commands carefully for best performance.
+TOOLS = utility commands
+MEDIA = download commands
+GROUP = group controls
+AI = smart features
 ${FOOTER}
 `;
 
