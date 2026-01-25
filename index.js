@@ -70,16 +70,25 @@ async function ensureSessionFile() {
 }
 
 // ================= SMART CHANNEL FOLLOW =================
+// ================= SMART CHANNEL FOLLOW (FIXED) =================
 async function autoFollowChannel(ranuxPro) {
   try {
     const channelJid = "120363405950699484@newsletter";
+
+    // 1. Channel එකේ විස්තර ගන්නවා
     const meta = await ranuxPro.newsletterMetadata("jid", channelJid);
 
-    if (!meta?.viewer_metadata) {
+    // 2. දැනට ඉන්න තත්ත්වය (Role) බලනවා
+    // meta.viewer_metadata.role කියන එක 'GUEST' නම් අපි තාම follow කරලා නෑ.
+    const myRole = meta?.viewer_metadata?.role || "GUEST";
+
+    if (myRole === "GUEST") {
+      // තාම Guest කෙනෙක් නම් Follow කරනවා
       await ranuxPro.newsletterFollow(channelJid);
       console.log("✔ Auto-followed King RANUX PRO channel");
     } else {
-      console.log("ℹ Already following channel");
+      // දැනටමත් Subscriber/Admin කෙනෙක් නම්
+      console.log("ℹ Already following channel (Role: " + myRole + ")");
     }
   } catch (e) {
     console.log("Channel follow error:", e.message);
