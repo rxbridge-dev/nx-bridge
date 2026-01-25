@@ -7,7 +7,7 @@ const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
  ⚙️ Accesses Raw Message Context directly
 */
 
-const FOOTER = `\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱`;
+const FOOTER = `\n\n> ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ`;
 
 cmd(
   {
