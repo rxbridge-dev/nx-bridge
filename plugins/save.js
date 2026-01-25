@@ -1,11 +1,10 @@
 const { cmd } = require("../command");
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-const fs = require('fs');
 
 /*
- 👑 King RANUX PRO – ViewOnce Recovery Plugin
- 🔒 Bypass WhatsApp One-Time View restriction
- ⚙️ Baileys Native Downloader (No external API needed)
+ 👑 King RANUX PRO – ViewOnce Recovery (Advanced Method)
+ 🔒 Bypasses "m.quoted" helper limitations
+ ⚙️ Accesses Raw Message Context directly
 */
 
 const FOOTER = `\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱`;
@@ -20,46 +19,38 @@ cmd(
   },
   async (bot, mek, m, { from, reply, isGroup, isAdmin, isOwner, isSudo }) => {
     try {
-      // 1. Permission Check (Group එකක් නම් Admin/Owner ට විතරයි - ඕන නම් අයින් කරන්න)
+      // 1. Check Permissions (Optional - Remove if not needed)
       if (isGroup && !isAdmin && !isOwner && !isSudo) {
-        return reply(
-          "❌ *Permission Denied*\n\n" +
-          "මෙම command එක භාවිතා කළ හැක්කේ Group Admins ලාට පමණි." + FOOTER
-        );
+        return reply("❌ *Permission Denied*\nAdmin/Owner only." + FOOTER);
       }
 
-      // 2. Validate Quoted Message
-      if (!m.quoted) {
-        return reply(
-          "⚠️ *ViewOnce Message එකකට Reply කරන්න!* \n\n" +
-          "ViewOnce photo හෝ video එකක් select කරලා `.vv` කියලා ගහන්න." + FOOTER
-        );
+      // 2. Check if quoted
+      if (!mek.message.extendedTextMessage || !mek.message.extendedTextMessage.contextInfo.quotedMessage) {
+        return reply("⚠️ *ViewOnce එකකට Reply කරන්න!*" + FOOTER);
       }
 
-      // 3. Detect ViewOnce Message Type
-      // ViewOnce messages come wrapped in 'viewOnceMessageV2' or 'viewOnceMessage'
-      let viewOnceMsg = m.quoted.message?.viewOnceMessageV2?.message || 
-                        m.quoted.message?.viewOnceMessage?.message || 
-                        m.quoted.message; // Fallback
+      // 3. Access RAW Quoted Message (Bypassing helpers)
+      const rawQuoted = mek.message.extendedTextMessage.contextInfo.quotedMessage;
 
-      let msgType = Object.keys(viewOnceMsg)[0]; // imageMessage or videoMessage
-      let mediaMsg = viewOnceMsg[msgType];
-      let finalType;
+      // 4. Find ViewOnce Data (Support V1, V2, and V2Extension)
+      let viewOnceMsg = rawQuoted.viewOnceMessageV2?.message || 
+                        rawQuoted.viewOnceMessage?.message || 
+                        rawQuoted.viewOnceMessageV2Extension?.message ||
+                        rawQuoted; // Fallback
 
-      if (msgType === "imageMessage") {
-        finalType = "image";
-      } else if (msgType === "videoMessage") {
-        finalType = "video";
-      } else {
-        return reply(
-          "❌ *මෙය ViewOnce Media එකක් නොවේ.* 😒\n" +
-          "කරුණාකර One-Time View Image/Video එකකට reply කරන්න." + FOOTER
-        );
+      // 5. Detect Type (Image or Video)
+      let msgType = Object.keys(viewOnceMsg).find(key => key === 'imageMessage' || key === 'videoMessage');
+
+      if (!msgType) {
+        return reply("❌ *Media එක සොයාගත නොහැක.* \n(මෙය ViewOnce එකක් නොවේ ද?)" + FOOTER);
       }
 
-      await reply("🔓 *ViewOnce Media Recover කරමින් පවතී...* ⏳");
+      const mediaMsg = viewOnceMsg[msgType];
+      const finalType = msgType === 'imageMessage' ? 'image' : 'video';
 
-      // 4. Download the Media Stream (Baileys Native)
+      await reply("🔓 *Recovering ViewOnce Media...* ⏳");
+
+      // 6. Download Stream (Baileys Native)
       const stream = await downloadContentFromMessage(mediaMsg, finalType);
       let buffer = Buffer.from([]);
       
@@ -67,18 +58,17 @@ cmd(
         buffer = Buffer.concat([buffer, chunk]);
       }
 
-      // 5. Send the Recovered Media
+      // 7. Send Back
       const caption = 
         `🔓 *VIEWONCE RECOVERED*\n\n` +
-        `👤 *Sender:* @${m.quoted.sender.split("@")[0]}\n` +
+        `👤 *From:* @${m.quoted.sender.split("@")[0]}\n` +
         `📁 *Type:* ${finalType.toUpperCase()}\n` +
-        `📦 *Saved:* 安全 (Secure)\n` +
         FOOTER;
 
       await bot.sendMessage(
         from,
         {
-          [finalType]: buffer, // image or video key dynamically
+          [finalType]: buffer,
           caption: caption,
           mentions: [m.quoted.sender]
         },
@@ -89,7 +79,7 @@ cmd(
       console.log("VIEWONCE ERROR:", e);
       reply(
         "❌ *Recover කිරීම අසාර්ථක විය.* 😢\n" +
-        "Message එක කල් ඉකුත් වී හෝ දැනටමත් delete කර තිබිය හැක." + FOOTER
+        "හේතුව: Message එක පරණ වැඩි නිසා හෝ දැනටමත් phone එකෙන් open කර ඇති නිසා media key එක expire වී ඇත." + FOOTER
       );
     }
   }
