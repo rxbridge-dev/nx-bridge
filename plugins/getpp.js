@@ -1,9 +1,15 @@
 const { cmd } = require("../command");
 
-// Rate limit system
+/*
+ 👑 King RANUX PRO – Get Profile Picture (Fixed & Enhanced)
+ 🔒 Uses Baileys native functions (No extra NPM needed)
+ ⚙️ Features: Rate Limit + Admin Check + Reply/Mention Target
+*/
+
+// --- RATE LIMIT SYSTEM ---
 const rateLimit = new Map();
-const LIMIT = 5; // 5 per minute
-const WINDOW = 60 * 1000;
+const LIMIT = 5; // විනාඩියකට උපරිම 5 පාරයි
+const WINDOW = 60 * 1000; // 1 Minute
 
 function isRateLimited(jid) {
   const now = Date.now();
@@ -11,101 +17,110 @@ function isRateLimited(jid) {
     rateLimit.set(jid, { count: 1, start: now });
     return false;
   }
-
   const data = rateLimit.get(jid);
   if (now - data.start > WINDOW) {
     rateLimit.set(jid, { count: 1, start: now });
     return false;
   }
-
   data.count++;
-  if (data.count > LIMIT) return true;
-  return false;
+  return data.count > LIMIT;
 }
+
+const FOOTER = `\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱`;
 
 cmd(
   {
     pattern: "getpp",
-    alias: ["getdp", "pp"],
-    desc: "Download user profile picture",
+    alias: ["getdp", "pp", "jid"],
+    desc: "Download user profile picture (Target Only)",
     category: "tools",
     react: "🖼️",
     filename: __filename,
   },
-  async (bot, mek, m, { from, reply, isGroup, isAdmins, isOwner, isSudo }) => {
+  async (bot, mek, m, { from, reply, isGroup, isAdmin, isOwner, isSudo }) => {
     try {
-      // Group privacy
-      if (isGroup && !isAdmins && !isOwner && !isSudo) {
+      // 1. Privacy Check (Group නම් Admin/Owner ට විතරයි - අවශ්‍ය නම් මෙය මකන්න)
+      if (isGroup && !isAdmin && !isOwner && !isSudo) {
         return reply(
           "❌ *Permission Denied*\n\n" +
-          "Group එකක `.getpp` භාවිතා කළ හැක්කේ\n" +
-          "Admins / Owner / Sudo පමණි."
+          "මෙම command එක භාවිතා කළ හැක්කේ Group Admins ලාට පමණි." + FOOTER
         );
       }
 
-      // Rate limit
+      // 2. Rate Limit Check
       if (isRateLimited(m.sender)) {
         return reply(
           "⏳ *Rate Limit Exceeded*\n\n" +
-          "5 per minute only.\n" +
-          "මිනිත්තු 1ක් පසු නැවත උත්සාහ කරන්න."
+          "ඔයා විනාඩියක් ඇතුලත ඕනවට වඩා try කරා. පොඩ්ඩක් ඉන්න." + FOOTER
         );
       }
 
-      const targetJid = m.sender;
+      // 3. Target Selection (වැදගත්ම කොටස)
+      let targetJid;
+      
+      if (m.quoted) {
+        // Reply කරපු කෙනාගේ JID එක
+        targetJid = m.quoted.sender;
+      } else if (mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length > 0) {
+        // Mention කරපු කෙනාගේ JID එක
+        targetJid = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
+      } else {
+        // කාවවත් select කරලා නැත්නම් Error එකක්
+        return reply(
+          "⚠️ *වැරදියි!* \n\n" +
+          "Please *Reply* to a user or *Mention* (@tag) someone to get their DP.\n" +
+          "(තමන්ගේ DP එක ලබා ගැනීමට මෙය භාවිතා කළ නොහැක)." + FOOTER
+        );
+      }
 
-      await bot.sendMessage(from, {
-        react: { text: "⏳", key: mek.key },
-      });
+      await bot.sendMessage(from, { react: { text: "⏳", key: mek.key } });
 
+      // 4. Get Profile Picture URL
       let ppUrl;
       try {
         ppUrl = await bot.profilePictureUrl(targetJid, "image");
       } catch (e) {
+        // Privacy settings නිසා හෝ DP නැත්නම්
+        await bot.sendMessage(from, { react: { text: "❌", key: mek.key } });
         return reply(
-          "❌ *Profile picture not available.*\n" +
-          "මෙම userගේ DP private හෝ නැත."
+          "❌ *Profile Picture Not Found*\n\n" +
+          "එයාගේ DP එක Private දාලා හෝ ඉවත් කරලා තියෙන්නේ." + FOOTER
         );
       }
 
-      // Name (fallback safe)
-      let name = targetJid.split("@")[0];
+      // 5. Get User Bio/Status
+      let about = "🔒 Private / No Bio";
       try {
-        const contact = await bot.onWhatsApp(targetJid);
-        if (contact?.[0]?.notify) name = contact[0].notify;
-      } catch {}
+        const statusData = await bot.fetchStatus(targetJid);
+        if (statusData?.status) about = statusData.status;
+      } catch (e) {
+        // Status ගන්න බැරි නම් අවුලක් නෑ, default එක තියමු
+      }
 
-      // About / status
-      let about = "Not available";
-      try {
-        const status = await bot.fetchStatus(targetJid);
-        if (status?.status) about = status.status;
-      } catch {}
+      // 6. Send Result
+      const caption =
+        `🖼️ *PROFILE PICTURE DOWNLOADED*\n\n` +
+        `👤 *User:* @${targetJid.split("@")[0]}\n` +
+        `📝 *Bio:* ${about}\n` +
+        `🔗 *JID:* \`${targetJid}\`\n` +
+        FOOTER;
 
       await bot.sendMessage(
         from,
         {
           image: { url: ppUrl },
-          caption:
-            "🖼️ *PROFILE PICTURE RECOVERED*\n\n" +
-            "👤 Name: " + name + "\n" +
-            "🆔 JID: " + targetJid + "\n" +
-            "💬 About: " + about + "\n\n" +
-            "📥 *Userගේ DP එක download කරන ලදී*\n\n" +
-            "👑 King RANUX PRO",
+          caption: caption,
+          mentions: [targetJid]
         },
         { quoted: mek }
       );
 
-      await bot.sendMessage(from, {
-        react: { text: "✅", key: mek.key },
-      });
+      await bot.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (err) {
       console.log("GETPP ERROR:", err);
       reply(
-        "❌ Failed to get profile picture.\n" +
-        "Profile picture ලබා ගැනීම අසාර්ථක විය."
+        "❌ *System Error*\n\nCommand එක ක්‍රියාත්මක වීමේදී දෝෂයක් ඇති විය." + FOOTER
       );
     }
   }
