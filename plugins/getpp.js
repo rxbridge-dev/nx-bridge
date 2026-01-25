@@ -1,40 +1,29 @@
-module.exports = {
-  name: "getpp",
+const { cmd } = require("../command");
+
+cmd({
+  pattern: "getpp",
   alias: ["getdp"],
-  desc: "Get user's profile picture",
+  desc: "Get user profile picture",
   category: "tools",
+  react: "🖼️",
+  filename: __filename
+}, async (conn, mek, m, { from, reply }) => {
 
-  async run({ sock, m }) {
-    try {
-      let jid;
+  try {
+    let jid;
 
-      if (m.quoted) {
-        jid = m.quoted.sender;
-      } else if (m.mentionedJid && m.mentionedJid.length > 0) {
-        jid = m.mentionedJid[0];
-      } else {
-        jid = m.sender;
-      }
+    if (mek.quoted) jid = mek.quoted.sender;
+    else if (mek.mentionedJid?.length) jid = mek.mentionedJid[0];
+    else jid = mek.sender;
 
-      const ppUrl = await sock.profilePictureUrl(jid, "image");
+    const pp = await conn.profilePictureUrl(jid, "image");
 
-      await sock.sendMessage(
-        m.chat,
-        {
-          image: { url: ppUrl },
-          caption: "🖼️ *User Profile Picture*\n\n👤 JID:\n" + jid
-        },
-        { quoted: m }
-      );
+    await conn.sendMessage(from, {
+      image: { url: pp },
+      caption: `🖼️ *Profile Picture*\n\n👤 JID:\n${jid}`
+    }, { quoted: mek });
 
-    } catch (err) {
-      await sock.sendMessage(
-        m.chat,
-        {
-          text: "❌ Profile picture not found or user has private DP."
-        },
-        { quoted: m }
-      );
-    }
+  } catch {
+    reply("❌ Profile picture not found or private.");
   }
-};
+});

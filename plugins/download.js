@@ -1,93 +1,158 @@
 const { cmd } = require("../command");
 const axios = require("axios");
+const cheerio = require("cheerio");
+const fs = require("fs-extra");
 const path = require("path");
 
-const FOOTER = `\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱`;
+const FOOTER = `
 
-cmd(
-  {
-    pattern: "download",
-    alias: ["downurl", "dl"],
-    react: "📦",
-    desc: "Download any size file via direct link",
-    category: "download",
-    filename: __filename,
-  },
-  async (bot, mek, m, { from, q, reply }) => {
-    try {
-      if (!q)
-        return reply(
-          "📦 *DIRECT FILE DOWNLOADER*\n\n" +
-          "🔗 Direct download link එකක් දාන්න!\n\n" +
-          "උදාහරණයක්:\n" +
-          "`.direct https://example.com/movie.mkv`" +
-          FOOTER
-        );
+━━━━━━━━━━━━━━━━━━━━━━
+👑 King RANUX PRO
+𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱
+━━━━━━━━━━━━━━━━━━━━━━
+`;
 
-      // React loading
-      await bot.sendMessage(from, {
-        react: { text: "⏳", key: mek.key },
-      });
+cmd({
+  pattern: "fetch",
+  alias: ["download", "downurl", "gdrive", "mediafire"],
+  desc: "Universal file downloader (Direct / MediaFire / Google Drive)",
+  category: "tools",
+  react: "📥",
+  filename: __filename
+}, async (bot, mek, m, { from, args, q, reply }) => {
 
-      // Filename from URL
-      let fileName = path.basename(new URL(q).pathname);
+  const url = q || args[0];
+  if (!url) {
+    return reply(
+`📦 *KING RANUX PRO – UNIVERSAL DOWNLOADER*
 
-      // HEAD request -> size
-      const head = await axios.head(q);
-      const size = parseInt(head.headers["content-length"] || 0);
-      const sizeMB = (size / 1024 / 1024).toFixed(2);
+Supported:
+.fetch / .download / .downurl
+.gdrive / .mediafire
 
-      let caption =
-        "📦 *KING RANUX PRO – DIRECT DOWNLOADER*\n\n" +
-        `📄 *File Name:* ${fileName}\n` +
-        `📊 *File Size:* ${sizeMB} MB\n\n`;
+Example:
+.fetch https://example.com/file.zip
+.mediafire https://mediafire.com/file/xxx
+.gdrive https://drive.google.com/file/d/ID/view
+${FOOTER}`
+    );
+  }
 
-      // If file > 2.1GB
-      if (sizeMB > 2100) {
-        caption +=
-          "⚠️ *File එක 2GBට වැඩි නිසා WhatsApp upload කරන්න බැහැ!*\n\n" +
-          "⬇️ *Direct Download Link:*\n" +
-          `${q}\n\n` +
-          "💡 *Tip:* ADM / IDM / Browser එකෙන් download කරන්න." +
-          FOOTER;
+  let finalUrl = url;
+  let fileName = "file";
 
-        await reply(caption);
+  try {
+    // ================= MEDIAFIRE =================
+    if (url.includes("mediafire.com")) {
+      const res = await axios.get(url);
+      const $ = cheerio.load(res.data);
+      finalUrl = $("#downloadButton").attr("href");
+      fileName = $(".filename").text().trim() || "mediafire_file";
+    }
 
-        // React done
-        await bot.sendMessage(from, {
-          react: { text: "🔗", key: mek.key },
-        });
-
-      } else {
-        caption +=
-          "⬇️ *File WhatsApp එකෙන් send වෙනවා…* 🚀\n\n" +
-          "Please wait..." +
-          FOOTER;
-
-        await bot.sendMessage(
-          from,
-          {
-            document: { url: q },
-            fileName: fileName,
-            mimetype: "application/octet-stream",
-            caption: caption,
-          },
-          { quoted: mek }
-        );
-
-        // React success
-        await bot.sendMessage(from, {
-          react: { text: "✅", key: mek.key },
-        });
+    // ================= GOOGLE DRIVE =================
+    if (url.includes("drive.google.com")) {
+      const idMatch = url.match(/\/d\/(.*?)\//);
+      if (idMatch) {
+        const fileId = idMatch[1];
+        finalUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+        fileName = "gdrive_file";
       }
+    }
 
-    } catch (err) {
-      console.error("DIRECT ERROR:", err);
-      reply(
-        "❌ *Direct download fail උනා!*\n\n" +
-        "Link එක valid ද කියලා check කරන්න." +
-        FOOTER
+    await bot.sendMessage(from, {
+      react: { text: "⏳", key: mek.key }
+    });
+
+    // HEAD -> size
+    let sizeMB = null;
+    try {
+      const head = await axios.head(finalUrl);
+      const size = parseInt(head.headers["content-length"] || 0);
+      sizeMB = (size / 1024 / 1024).toFixed(2);
+    } catch {}
+
+    // If > 2GB -> give link only
+    if (sizeMB && sizeMB > 2100) {
+      return reply(
+`⚠️ *FILE TOO LARGE*
+
+📊 Size: ${sizeMB} MB
+WhatsApp limit exceeded!
+
+⬇️ Direct Link:
+${finalUrl}
+
+💡 Use IDM / ADM / Browser
+${FOOTER}`
       );
     }
+
+    // Download stream
+    const response = await axios({
+      url: finalUrl,
+      method: "GET",
+      responseType: "stream",
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+
+    const contentType = response.headers["content-type"];
+    const ext = contentType?.includes("/")
+      ? "." + contentType.split("/")[1].split(";")[0]
+      : "";
+
+    fileName = fileName + ext;
+
+    const tempDir = path.join(__dirname, "../temp");
+    await fs.ensureDir(tempDir);
+
+    const filePath = path.join(tempDir, fileName);
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
+
+    await new Promise((res, rej) => {
+      writer.on("finish", res);
+      writer.on("error", rej);
+    });
+
+    await bot.sendMessage(
+      from,
+      {
+        document: { url: filePath },
+        fileName,
+        mimetype: contentType || "application/octet-stream",
+        caption:
+`📦 *File Downloaded Successfully*
+
+📄 Name: ${fileName}
+📊 Size: ${sizeMB || "Unknown"} MB
+🚀 Sent via WhatsApp
+
+${FOOTER}`
+      },
+      { quoted: mek }
+    );
+
+    await bot.sendMessage(from, {
+      react: { text: "✅", key: mek.key }
+    });
+
+    // cleanup
+    setTimeout(() => {
+      try { fs.unlinkSync(filePath); } catch {}
+    }, 15000);
+
+  } catch (err) {
+    console.log("SUPDL ERROR:", err.message);
+    reply(
+`❌ *Download Failed*
+
+Possible reasons:
+• Invalid link
+• Expired link
+• Server blocked
+
+${FOOTER}`
+    );
   }
-);
+});
