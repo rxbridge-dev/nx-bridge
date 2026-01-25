@@ -1,121 +1,95 @@
 const { cmd } = require("../command");
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const fs = require('fs');
 
-const rateLimit = new Map();
-const LIMIT = 5;
-const WINDOW = 60 * 1000;
+/*
+ 👑 King RANUX PRO – ViewOnce Recovery Plugin
+ 🔒 Bypass WhatsApp One-Time View restriction
+ ⚙️ Baileys Native Downloader (No external API needed)
+*/
 
-function isRateLimited(jid) {
-  const now = Date.now();
-  if (!rateLimit.has(jid)) {
-    rateLimit.set(jid, { count: 1, start: now });
-    return false;
-  }
-  const data = rateLimit.get(jid);
-  if (now - data.start > WINDOW) {
-    rateLimit.set(jid, { count: 1, start: now });
-    return false;
-  }
-  data.count++;
-  return data.count > LIMIT;
-}
+const FOOTER = `\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱`;
 
 cmd(
   {
-    pattern: "viewonce",
-    alias: ["once", "vov"],
-    desc: "Recover one-time view image/video",
+    pattern: "vv",
+    alias: ["viewonce", "recover", "vo"],
+    desc: "Recover ViewOnce (One-Time) images/videos",
     category: "tools",
-    react: "👁️",
     filename: __filename,
   },
   async (bot, mek, m, { from, reply, isGroup, isAdmin, isOwner, isSudo }) => {
     try {
+      // 1. Permission Check (Group එකක් නම් Admin/Owner ට විතරයි - ඕන නම් අයින් කරන්න)
       if (isGroup && !isAdmin && !isOwner && !isSudo) {
         return reply(
           "❌ *Permission Denied*\n\n" +
-          "මෙම command එක භාවිතා කළ හැක්කේ\n" +
-          "Group Admins / Bot Owner / Sudo Users පමණි."
+          "මෙම command එක භාවිතා කළ හැක්කේ Group Admins ලාට පමණි." + FOOTER
         );
       }
 
-      if (isRateLimited(m.sender)) {
-        return reply(
-          "⏳ *Rate Limit Exceeded*\n\n" +
-          "You can only use this command 5 times per minute.\n" +
-          "මිනිත්තු 1ක් බලා නැවත උත්සාහ කරන්න."
-        );
-      }
-
+      // 2. Validate Quoted Message
       if (!m.quoted) {
         return reply(
-          "👁️ *ONE-TIME VIEW DOWNLOADER*\n\n" +
-          "One-time view photo/video එකකට reply කරලා\n" +
-          "`.once` හෝ `.viewonce` කියලා දාන්න."
+          "⚠️ *ViewOnce Message එකකට Reply කරන්න!* \n\n" +
+          "ViewOnce photo හෝ video එකක් select කරලා `.vv` කියලා ගහන්න." + FOOTER
         );
       }
 
-      const qmsg = m.quoted.message;
+      // 3. Detect ViewOnce Message Type
+      // ViewOnce messages come wrapped in 'viewOnceMessageV2' or 'viewOnceMessage'
+      let viewOnceMsg = m.quoted.message?.viewOnceMessageV2?.message || 
+                        m.quoted.message?.viewOnceMessage?.message || 
+                        m.quoted.message; // Fallback
 
-      const viewOnce =
-        qmsg?.viewOnceMessageV2?.message ||
-        qmsg?.viewOnceMessageV2Extension?.message ||
-        qmsg?.viewOnceMessage?.message;
+      let msgType = Object.keys(viewOnceMsg)[0]; // imageMessage or videoMessage
+      let mediaMsg = viewOnceMsg[msgType];
+      let finalType;
 
-      if (!viewOnce) {
+      if (msgType === "imageMessage") {
+        finalType = "image";
+      } else if (msgType === "videoMessage") {
+        finalType = "video";
+      } else {
         return reply(
-          "❌ *Not One-Time View Media*\n\n" +
-          "මෙය One-Time View media එකක් නොවේ."
+          "❌ *මෙය ViewOnce Media එකක් නොවේ.* 😒\n" +
+          "කරුණාකර One-Time View Image/Video එකකට reply කරන්න." + FOOTER
         );
       }
 
-      const media =
-        viewOnce.imageMessage ||
-        viewOnce.videoMessage;
+      await reply("🔓 *ViewOnce Media Recover කරමින් පවතී...* ⏳");
 
-      if (!media) {
-        return reply("❌ Media type not supported.");
+      // 4. Download the Media Stream (Baileys Native)
+      const stream = await downloadContentFromMessage(mediaMsg, finalType);
+      let buffer = Buffer.from([]);
+      
+      for await (const chunk of stream) {
+        buffer = Buffer.concat([buffer, chunk]);
       }
 
-      await bot.sendMessage(from, {
-        react: { text: "⏳", key: mek.key },
-      });
-
-      const buffer = await bot.downloadMediaMessage({
-        key: m.quoted.key,
-        message: qmsg,
-      });
-
-      const isVideo = media.mimetype.includes("video");
-      const fileName = isVideo
-        ? `viewonce_${Date.now()}.mp4`
-        : `viewonce_${Date.now()}.jpg`;
+      // 5. Send the Recovered Media
+      const caption = 
+        `🔓 *VIEWONCE RECOVERED*\n\n` +
+        `👤 *Sender:* @${m.quoted.sender.split("@")[0]}\n` +
+        `📁 *Type:* ${finalType.toUpperCase()}\n` +
+        `📦 *Saved:* 安全 (Secure)\n` +
+        FOOTER;
 
       await bot.sendMessage(
         from,
         {
-          document: buffer,
-          fileName,
-          mimetype: media.mimetype,
-          caption:
-            "👁️ *ONE-TIME VIEW RECOVERED*\n" +
-            "━━━━━━━━━━━━━━━━━━\n" +
-            "🔓 Media unlocked successfully\n" +
-            "📦 Document ලෙස (no compression)\n\n" +
-            "👁️ One-Time View media එක recover කර ඇත\n" +
-            "⚡ King RANUX PRO",
+          [finalType]: buffer, // image or video key dynamically
+          caption: caption,
+          mentions: [m.quoted.sender]
         },
         { quoted: mek }
       );
 
-      await bot.sendMessage(from, {
-        react: { text: "✅", key: mek.key },
-      });
-
-    } catch (err) {
-      console.log("VIEWONCE ERROR:", err);
+    } catch (e) {
+      console.log("VIEWONCE ERROR:", e);
       reply(
-        "❌ Failed to recover one-time view media.\n" +
-        "Media recover කිරීම අසාර්ථක විය."
+        "❌ *Recover කිරීම අසාර්ථක විය.* 😢\n" +
+        "Message එක කල් ඉකුත් වී හෝ දැනටමත් delete කර තිබිය හැක." + FOOTER
       );
     }
   }
