@@ -2,39 +2,52 @@ const { cmd } = require("../command");
 
 cmd({
     pattern: "checkjid",
-    desc: "Get real JID and debug channel",
-    category: "main",
+    desc: "Get JID from a forwarded channel message (Fixed)",
+    category: "tools",
     filename: __filename
 },
 async (bot, mek, m, { from, reply }) => {
-    if (!m.quoted) return reply("Please reply to a forwarded Channel Message.");
-
     try {
-        const context = mek.message?.extendedTextMessage?.contextInfo;
-        const forwardedJid = context?.forwardedNewsletterMessageInfo?.newsletterJid;
-        const name = context?.forwardedNewsletterMessageInfo?.newsletterName;
+        // 1. Check if user quoted a message
+        if (!m.quoted) return reply("⚠️ Please reply to a forwarded Channel Message.");
 
-        if (forwardedJid) {
-            let msg = `📢 *CHANNEL FOUND!*\n\n`;
-            msg += `📛 Name: ${name}\n`;
-            msg += `🆔 Real JID: \`${forwardedJid}\`\n\n`;
+        // 2. Access the Raw Quoted Message directly
+        // We look inside the message you sent (.checkjid), find the quoted part, and dig in.
+        const rawQuoted = mek.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
+        if (!rawQuoted) return reply("❌ Message data read error.");
+
+        // 3. Find the message type (Text, Image, Video, etc.)
+        // It could be extendedTextMessage, imageMessage, videoMessage, etc.
+        const msgType = Object.keys(rawQuoted)[0];
+        const msgContent = rawQuoted[msgType];
+
+        // 4. Extract Newsletter Info
+        // The path is: QuotedMessage -> MessageContent -> contextInfo -> forwardedNewsletterMessageInfo
+        const newsletterInfo = msgContent?.contextInfo?.forwardedNewsletterMessageInfo;
+
+        if (newsletterInfo && newsletterInfo.newsletterJid) {
+            const jid = newsletterInfo.newsletterJid;
+            const name = newsletterInfo.newsletterName || "Unknown";
+            const serverId = newsletterInfo.serverMessageId || "N/A";
+
+            let msg = `📢 *CHANNEL INFO FOUND* 📢\n\n`;
+            msg += `📛 *Name:* ${name}\n`;
+            msg += `🆔 *JID:* \`${jid}\`\n`; // Backticks for easy copy
+            msg += `🔢 *Msg ID:* ${serverId}\n\n`;
             
-            // Try to fetch metadata live
-            try {
-                const meta = await bot.newsletterMetadata("jid", forwardedJid);
-                msg += `✅ Bot can see this channel!\n`;
-                msg += `Role: ${meta.viewer_metadata.role}\n`;
-            } catch (e) {
-                msg += `❌ Bot CANNOT see this channel.\n`;
-                msg += `Error: ${e.message}\n`;
-            }
+            msg += `👇 *Code for index.js:*\n`;
+            msg += `const channelJid = "${jid}";`;
 
             return reply(msg);
+
         } else {
-            reply("❌ මෙය Channel Message එකක් නොවේ.");
+            console.log("RAW QUOTED OBJECT:", JSON.stringify(rawQuoted, null, 2)); // Debugging log
+            return reply("❌ මෙය Channel එකකින් Forward කළ Message එකක් බව පෙනෙන්නට නැත.\n(Metadata not found in quote).");
         }
+
     } catch (e) {
-        console.log(e);
-        reply("Unknown Error");
+        console.log("CHECKJID ERROR:", e);
+        reply("⚠️ Error: " + e.message);
     }
 });
