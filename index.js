@@ -69,36 +69,45 @@ async function ensureSessionFile() {
   }
 }
 
-// ================= SMART CHANNEL FOLLOW (SAFE MODE) =================
+// ================= SMART CHANNEL FOLLOW (VIA LINK) =================
 async function autoFollowChannel(ranuxPro) {
   try {
-    const channelJid = "120363405950699484@newsletter";
+    // 1. ඔයාගේ Channel Link Code එක (Invite Code)
+    const inviteCode = "0029VbC5zjdAojYzyAJS7U2S";
 
-    // 1. Metadata ගන්න ට්‍රයි කරනවා
-    const meta = await ranuxPro.newsletterMetadata("jid", channelJid).catch(e => null);
+    console.log("🔄 Resolving Channel via Link...");
 
-    if (!meta) {
-      console.log("⚠️ Auto Follow: Channel එක හොයාගන්න බෑ (JID වැරදි හෝ Server Busy).");
+    // 2. Link එකෙන් Channel එකේ විස්තර ගන්නවා (JID එක මේකෙන් Auto එනවා)
+    // "invite" කියන method එකෙන් JID එක ඕනේ නෑ, Code එක ඇති.
+    const meta = await ranuxPro.newsletterMetadata("invite", inviteCode);
+
+    if (!meta?.id) {
+      console.log("❌ Channel එක Link එකෙන් හොයාගන්න බැරි විය.");
       return;
     }
 
-    // 2. Role එක බලනවා
-    const myRole = meta?.viewer_metadata?.role || "GUEST";
+    // 3. දැන් අපි හරියටම JID එක දන්නවා (meta.id)
+    const channelJid = meta.id;
+    const myRole = meta.viewer_metadata?.role || "GUEST";
+
+    console.log(`✅ Channel Found: ${meta.name}`);
+    console.log(`👤 Current Role: ${myRole}`);
 
     if (myRole === "GUEST") {
-      // 3. Follow කරන්න ට්‍රයි කරනවා
+      // 4. Follow කරනවා
+      console.log("➕ Following channel...");
       await ranuxPro.newsletterFollow(channelJid);
-      console.log("✔ Auto-followed King RANUX PRO channel");
+      console.log("✔ Auto-followed King RANUX PRO successfully!");
     } else {
-      console.log(`ℹ Already connected to channel as: ${myRole}`);
+      console.log("ℹ Already following (or Owner). No action needed.");
     }
 
   } catch (e) {
-    // 4. විශේෂ Error Handling (Admin History ප්‍රශ්නය විසඳීම)
+    // Error Handling
     if (e.message.includes("Not Allowed")) {
-      console.log("⚠️ Auto Follow Skipped: ඔයා කලින් Admin හිටපු නිසා API එකෙන් Follow කරන්න බැහැ. (Phone එකෙන් Manually Follow කරන්න).");
+      console.log("⚠️ Skipped: ඔයා මේ Channel එකේ Owner/Admin නිසා Follow කරන්න අවශ්‍ය නැත.");
     } else {
-      console.log("⚠️ Auto Follow Error:", e.message);
+      console.log("❌ Follow Error:", e.message);
     }
   }
 }
