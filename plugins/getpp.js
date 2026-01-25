@@ -1,29 +1,114 @@
 const { cmd } = require("../command");
 
-cmd({
-  pattern: "getpp",
-  alias: ["getdp"],
-  desc: "Get user profile picture",
-  category: "tools",
-  react: "🖼️",
-  filename: __filename
-}, async (conn, mek, m, { from, reply }) => {
+// Rate limit system
+const rateLimit = new Map();
+const LIMIT = 5; // 5 per minute
+const WINDOW = 60 * 1000;
 
-  try {
-    let jid;
-
-    if (mek.quoted) jid = mek.quoted.sender;
-    else if (mek.mentionedJid?.length) jid = mek.mentionedJid[0];
-    else jid = mek.sender;
-
-    const pp = await conn.profilePictureUrl(jid, "image");
-
-    await conn.sendMessage(from, {
-      image: { url: pp },
-      caption: `🖼️ *Profile Picture*\n\n👤 JID:\n${jid}`
-    }, { quoted: mek });
-
-  } catch {
-    reply("❌ Profile picture not found or private.");
+function isRateLimited(jid) {
+  const now = Date.now();
+  if (!rateLimit.has(jid)) {
+    rateLimit.set(jid, { count: 1, start: now });
+    return false;
   }
-});
+
+  const data = rateLimit.get(jid);
+  if (now - data.start > WINDOW) {
+    rateLimit.set(jid, { count: 1, start: now });
+    return false;
+  }
+
+  data.count++;
+  if (data.count > LIMIT) return true;
+  return false;
+}
+
+cmd(
+  {
+    pattern: "getpp",
+    alias: ["getdp", "pp"],
+    desc: "Download user profile picture",
+    category: "tools",
+    react: "🖼️",
+    filename: __filename,
+  },
+  async (bot, mek, m, { from, reply, isGroup, isAdmin, isOwner, isSudo }) => {
+    try {
+      // Privacy: Admin / Owner / Sudo only in groups
+      if (isGroup && !isAdmin && !isOwner && !isSudo) {
+        return reply(
+          "❌ *Permission Denied*\n\n" +
+          "මෙම command එක භාවිතා කළ හැක්කේ\n" +
+          "Group Admins / Bot Owner / Sudo Users පමණි."
+        );
+      }
+
+      // Rate limit
+      if (isRateLimited(m.sender)) {
+        return reply(
+          "⏳ *Rate Limit Exceeded*\n\n" +
+          "You can only use `.getpp` 5 times per minute.\n" +
+          "කරුණාකර මිනිත්තු 1ක් බලා නැවත උත්සාහ කරන්න."
+        );
+      }
+
+      // Target = the person who sent the message
+      const targetJid = m.sender;
+
+      await bot.sendMessage(from, {
+        react: { text: "⏳", key: mek.key },
+      });
+
+      let ppUrl;
+      try {
+        ppUrl = await bot.profilePictureUrl(targetJid, "image");
+      } catch (e) {
+        return reply(
+          "❌ Profile picture not available.\n" +
+          "මෙම userගේ DP private හෝ නැත."
+        );
+      }
+
+      // Get user name
+      let name = targetJid.split("@")[0];
+      try {
+        const contact = await bot.getContact(targetJid);
+        if (contact?.name) name = contact.name;
+      } catch {}
+
+      // Get about/status
+      let about = "Not available";
+      try {
+        const status = await bot.fetchStatus(targetJid);
+        if (status?.status) about = status.status;
+      } catch {}
+
+      // Send image
+      await bot.sendMessage(
+        from,
+        {
+          image: { url: ppUrl },
+          caption:
+            "🖼️ *PROFILE PICTURE DOWNLOADED*\n\n" +
+            "👤 Name: " + name + "\n" +
+            "🆔 JID: " + targetJid + "\n" +
+            "💬 About: " + about + "\n\n" +
+            "🖼️ *Userගේ Profile Picture එක ලබා ගන්නා ලදි*\n\n" +
+            "👑 King RANUX PRO",
+        },
+        { quoted: mek }
+      );
+
+      await bot.sendMessage(from, {
+        react: { text: "✅", key: mek.key },
+      });
+
+    } catch (err) {
+      console.log("GETPP ERROR:", err);
+      reply(
+        "❌ Failed to get profile picture.\n" +
+        "Profile picture ලබා ගැනීම අසාර්ථක විය."
+      );
+    }
+  }
+);
