@@ -1,195 +1,172 @@
 const { cmd } = require("../command");
 const puppeteer = require("puppeteer");
-const config = require("../config");
+const axios = require("axios");
+const cheerio = require("cheerio");
 
 // Session handling
 const pendingSearch = {};
 const pendingQuality = {};
 
 /* 
- 👑 King RANUX PRO – Cinesubz Downloader
- 🌐 Scrapes: Cinesubz -> API -> SonicCloud -> Google Drive
- ⚙️ Features: Automated Link Bypassing & Direct GDrive Extraction
+ 👑 King RANUX PRO – Cinesubz Downloader (Fixed)
+ ⚙️ Tech: Axios/Cheerio (Search) + Puppeteer (Bypass)
+ 🚀 Fixes: "No results found" error & Faster Scraping
 */
 
-// --- 1. SEARCH FUNCTION ---
+// --- 1. SEARCH FUNCTION (Updated to Axios + Cheerio) ---
 async function searchCinesubz(query) {
-    const searchUrl = `https://cinesubz.net/?s=${encodeURIComponent(query)}`;
-    
-    // Launch Browser
-    const browser = await puppeteer.launch({ 
-        headless: true, 
-        args: ["--no-sandbox", "--disable-setuid-sandbox"] 
-    });
-    const page = await browser.newPage();
-    
     try {
-        await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-
-        // Scrape Search Results
-        const results = await page.evaluate(() => {
-            const items = [];
-            // Select common article structures in Cinesubz theme
-            document.querySelectorAll("article, .result-item").forEach((box, index) => {
-                const a = box.querySelector("a");
-                const img = box.querySelector("img");
-                const title = box.querySelector(".entry-title, .title")?.textContent || "";
-                
-                if (a && title) {
-                    items.push({
-                        id: index + 1,
-                        title: title.trim(),
-                        url: a.href,
-                        thumb: img ? img.src : "",
-                        type: "Movie"
-                    });
-                }
-            });
-            return items.slice(0, 10); // Return top 10
+        const searchUrl = `https://cinesubz.net/?s=${encodeURIComponent(query)}`;
+        // User-Agent දානවා Browser එකක් වගේ පෙන්නන්න
+        const { data } = await axios.get(searchUrl, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+            }
         });
 
-        await browser.close();
-        return results;
+        const $ = cheerio.load(data);
+        const results = [];
+
+        // Cinesubz Structure එකේ ෆිල්ම් තියෙන තැන් ස්කෑන් කරනවා
+        // (.result-item, article, .item කියන class තුනම check කරනවා)
+        $(".result-item, article, .item").each((i, el) => {
+            const title = $(el).find(".title, .entry-title").text().trim();
+            const url = $(el).find("a").attr("href");
+            const thumb = $(el).find("img").attr("src");
+
+            if (title && url) {
+                results.push({
+                    id: i + 1,
+                    title: title,
+                    url: url,
+                    thumb: thumb || "",
+                    type: "Movie"
+                });
+            }
+        });
+
+        return results.slice(0, 10); // Top 10 results
     } catch (e) {
-        await browser.close();
         console.log("Search Error:", e);
         return [];
     }
 }
 
-// --- 2. METADATA & LINK EXTRACTOR ---
+// --- 2. METADATA & LINK EXTRACTOR (Axios + Cheerio) ---
 async function getMovieInfo(url) {
-    const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
-    const page = await browser.newPage();
-    
     try {
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+        const { data } = await axios.get(url, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+            }
+        });
+        
+        const $ = cheerio.load(data);
+        
+        const title = $(".entry-title").text().trim() || "Unknown Title";
+        const imdb = $(".imdb-rating").text().trim() || "N/A";
+        const image = $(".entry-content img").first().attr("src") || "";
+        const desc = $(".entry-content p").first().text().trim().substring(0, 200) + "...";
 
-        // Scrape Details & Initial Links
-        const data = await page.evaluate(() => {
-            const title = document.querySelector(".entry-title")?.textContent.trim() || "Unknown Title";
-            const imdb = document.querySelector(".imdb-rating")?.textContent.trim() || "N/A";
-            const image = document.querySelector(".entry-content img")?.src || "";
-            const desc = document.querySelector(".entry-content p")?.textContent.trim().substring(0, 200) + "...";
+        // Download Links සොයා ගැනීම
+        const links = [];
+        $("a").each((i, el) => {
+            const href = $(el).attr("href");
+            const text = $(el).text().toUpperCase();
 
-            // Extract Download Buttons (Looking for buttons that point to cinesubz.lk/api)
-            const links = [];
-            document.querySelectorAll("a").forEach(a => {
-                if (a.href.includes("cinesubz.lk/api") || a.textContent.includes("Download")) {
-                    // Try to guess quality from text
-                    let quality = "SD";
-                    const text = a.textContent.toUpperCase();
-                    if (text.includes("1080")) quality = "1080p (FHD)";
-                    else if (text.includes("720")) quality = "720p (HD)";
-                    else if (text.includes("480")) quality = "480p (SD)";
-                    
-                    // Only add if it looks like a download link
-                    if (a.href.includes("api") || a.href.includes("sonic-cloud")) {
-                        links.push({
-                            quality: quality,
-                            link: a.href
-                        });
-                    }
-                }
-            });
-
-            // Remove duplicates
-            const uniqueLinks = [];
-            const seen = new Set();
-            links.forEach(l => {
-                if (!seen.has(l.link)) {
-                    uniqueLinks.push(l);
-                    seen.add(l.link);
-                }
-            });
-
-            return { title, imdb, image, desc, links: uniqueLinks };
+            // Link එක API එකට හෝ Sonic Cloud එකට යනවද බලනවා
+            if (href && (href.includes("cinesubz.lk/api") || href.includes("sonic-cloud"))) {
+                let quality = "SD";
+                if (text.includes("1080")) quality = "1080p (FHD)";
+                else if (text.includes("720")) quality = "720p (HD)";
+                else if (text.includes("480")) quality = "480p (SD)";
+                
+                links.push({ quality, link: href });
+            }
         });
 
-        await browser.close();
-        return data;
+        // Duplicates ඉවත් කිරීම
+        const uniqueLinks = [];
+        const seen = new Set();
+        links.forEach(l => {
+            if (!seen.has(l.link)) {
+                uniqueLinks.push(l);
+                seen.add(l.link);
+            }
+        });
+
+        return { title, imdb, image, desc, links: uniqueLinks };
 
     } catch (e) {
-        await browser.close();
-        throw e;
+        console.log("Info Error:", e);
+        throw new Error("Failed to fetch movie details.");
     }
 }
 
-// --- 3. COMPLEX LINK BYPASS (The Hard Part) ---
+// --- 3. LINK BYPASS (Puppeteer - Only used here) ---
 async function getFinalGoogleDriveLink(initialLink) {
     const browser = await puppeteer.launch({ 
-        headless: true, 
-        args: ["--no-sandbox", "--disable-popup-blocking"] // Allow popups to catch GDrive
+        headless: true, // Server එකේ run වෙන්න "new" හෝ true දාන්න
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-popup-blocking"]
     });
     const page = await browser.newPage();
     let finalUrl = null;
 
     try {
-        console.log("🔄 Step 1: Visiting API Link...");
+        console.log("🔄 Bypassing: Visiting API Link...");
         await page.goto(initialLink, { waitUntil: "networkidle2", timeout: 60000 });
 
-        // --- STEP 1: API Page (cinesubz.lk/api...) ---
-        // Wait for countdown (usually 1-3 seconds)
+        // --- STEP 1: Cinesubz API Page ---
+        // Wait for potential timer
         await new Promise(r => setTimeout(r, 4000));
-        
-        // Find and click the link to Sonic Cloud
-        // Usually it's an anchor tag that appears after timer
+
+        // Find SonicCloud Link
         const sonicUrl = await page.evaluate(() => {
             const anchors = Array.from(document.querySelectorAll("a"));
-            // Look for link containing sonic-cloud
             const target = anchors.find(a => a.href.includes("sonic-cloud"));
             return target ? target.href : null;
         });
 
-        if (!sonicUrl) throw new Error("SonicCloud link not found in API page.");
-        
-        console.log("🔄 Step 2: Visiting SonicCloud...");
-        await page.goto(sonicUrl, { waitUntil: "networkidle2" });
+        if (!sonicUrl) throw new Error("SonicCloud redirect link not found.");
 
-        // --- STEP 2: Sonic Cloud (sonic-cloud.online) ---
-        // Need to click "Google Download 1" (Purple Button)
-        // Then handle the popup "Google Server" -> "Download"
+        console.log("🔄 Bypassing: Visiting SonicCloud...");
+        await page.goto(sonicUrl, { waitUntil: "domcontentloaded" });
 
-        // We will intercept the request instead of fighting with popups
-        // The "Download" button inside the popup usually triggers a navigation to GDrive
-        
-        // Setup Request Interception to catch the GDrive Link
+        // --- STEP 2: Sonic Cloud ---
+        // Setup Request Interception to catch GDrive Link
         await page.setRequestInterception(true);
         page.on('request', request => {
             const url = request.url();
-            // If we see a Google Drive link, capture it!
+            // Google Drive Link එකක් දැක්ක ගමන් අල්ලගන්නවා
             if (url.includes("drive.google.com") || url.includes("googleusercontent.com")) {
                 finalUrl = url;
                 console.log("✅ Final Link Captured:", url);
-                request.abort(); // Stop loading, we got what we need
+                request.abort();
             } else {
                 request.continue();
             }
         });
 
-        // Trigger the clicks via DOM evaluation
+        // Click Logic (Generic Text Matching)
         await page.evaluate(() => {
-            // 1. Find "Google Download 1" button
-            const buttons = Array.from(document.querySelectorAll("button, a"));
-            const gButton = buttons.find(b => b.textContent.includes("Google Download 1"));
+            // Find "Google Download 1" or any "Google" button
+            const buttons = Array.from(document.querySelectorAll("button, a, div"));
+            const gButton = buttons.find(b => b.textContent.toLowerCase().includes("google download"));
             if (gButton) gButton.click();
         });
 
-        // Wait for the Modal/Popup to appear
+        // Wait for popup
         await new Promise(r => setTimeout(r, 2000));
 
         await page.evaluate(() => {
-            // 2. Find "Download" or "Close" inside the popup.
-            // Based on screenshot: "Download" and "Close" buttons.
-            const modals = document.querySelectorAll(".modal, .popup, div"); // Generic selector
-            // Search deeply for the specific Download button in the popup
-            const allBtns = Array.from(document.querySelectorAll("button"));
+            // Click "Download" in popup
+            const allBtns = Array.from(document.querySelectorAll("button, a"));
             const dlBtn = allBtns.find(b => b.textContent.trim() === "Download");
             if (dlBtn) dlBtn.click();
         });
 
-        // Wait a bit for the request interceptor to catch the URL
-        await new Promise(r => setTimeout(r, 5000));
+        // Wait for interceptor
+        await new Promise(r => setTimeout(r, 8000));
 
     } catch (e) {
         console.log("Bypass Error:", e.message);
@@ -216,7 +193,7 @@ cmd({
     await reply("🔎 *Searching on Cinesubz...*");
     const results = await searchCinesubz(q);
 
-    if (!results.length) return reply("❌ *No results found.*");
+    if (!results.length) return reply("❌ *No results found.* (Try checking spelling)");
 
     pendingSearch[sender] = { results, timestamp: Date.now() };
 
@@ -239,21 +216,21 @@ cmd({
 
     const index = parseInt(body.trim()) - 1;
     const selectedMovie = pendingSearch[sender].results[index];
-    delete pendingSearch[sender]; // Clear search session
+    delete pendingSearch[sender]; 
 
     await reply(`🔄 *Fetching Data for:*\n${selectedMovie.title}...`);
 
     try {
         const metadata = await getMovieInfo(selectedMovie.url);
         
+        if (!metadata.links.length) return reply("❌ Download links not found.");
+
         pendingQuality[sender] = { metadata, timestamp: Date.now() };
 
         let msg = `🎬 *${metadata.title}*\n\n`;
         msg += `⭐ IMDb: ${metadata.imdb}\n`;
         msg += `📝 Desc: ${metadata.desc}\n\n`;
         msg += `⬇️ *Select Quality:*\n`;
-
-        if (!metadata.links.length) return reply("❌ Download links not found.");
 
         metadata.links.forEach((l, i) => {
             msg += `*${i + 1}.* ${l.quality}\n`;
@@ -283,12 +260,11 @@ cmd({
     const { metadata } = pendingQuality[sender];
     const selectedLink = metadata.links[index];
     
-    delete pendingQuality[sender]; // Clear quality session
+    delete pendingQuality[sender]; 
 
     await reply(`🚀 *Bypassing Links...* (This may take 10-20s)\nSelected: ${selectedLink.quality}`);
 
     try {
-        // Run the complex bypasser
         const finalUrl = await getFinalGoogleDriveLink(selectedLink.link);
 
         if (!finalUrl) {
@@ -297,7 +273,6 @@ cmd({
 
         await reply("✅ *Link Extracted! Uploading...*");
 
-        // Send Document
         await bot.sendMessage(from, {
             document: { url: finalUrl },
             mimetype: "video/mp4",
@@ -307,7 +282,7 @@ cmd({
 
     } catch (e) {
         console.log("Download Error:", e);
-        reply("❌ *Upload Failed.*\nReason: File might be too large for WhatsApp Bot or Google Drive Limit exceeded.\n\n🔗 *Direct Link:* " + (e.finalUrl || "N/A"));
+        reply("❌ *Upload Failed.*\nGoogle Drive Limit exceeded or File too large.");
     }
 });
 
