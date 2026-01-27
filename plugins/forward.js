@@ -1,5 +1,11 @@
 const { cmd } = require("../command");
 
+/*
+ 👑 King RANUX PRO – Forward Plugin
+ ⚙️ Fixed for Baileys v6+ (sendMessage method)
+ 🔄 Supports: Text, Image, Video, Audio, Sticker
+*/
+
 cmd({
     pattern: "forward",
     alias: ["fwd"],
@@ -19,7 +25,7 @@ cmd({
             return reply(
                 "⚠️ *Target Number/JID එකක් ලබා දෙන්න.*\n\n" +
                 "උදාහරණ:\n" +
-                "1️⃣ `.fwd 94712345678` (Private)\n" +
+                "1️⃣ `.fwd 9471xxxxxxx` (Private)\n" +
                 "2️⃣ `.fwd 12345678@g.us` (Group)\n" +
                 "3️⃣ `.fwd 12345@newsletter` (Channel)"
             );
@@ -34,13 +40,14 @@ cmd({
 
         // 3. Forward කිරීමට අවශ්‍ය මැසේජ් එක සකසා ගැනීම
         // m.quoted එක කෙලින්ම යවන්න බැරි නිසා, අපි Raw Message Data එක ගන්නවා
+        // මේකෙන් තමයි Image/Video quality එක අඩු නොවී යන්නේ
         const context = mek.message?.extendedTextMessage?.contextInfo;
         
         if (!context || !context.quotedMessage) {
-            return reply("❌ Message content එක කියවීමට නොහැක.");
+            return reply("❌ Message content එක කියවීමට නොහැක. (Text එකක් පමණක් නම් එය copy කර යවන්න)");
         }
 
-        // Forward Object එක හැදීම
+        // Virtual Message Object එකක් හදනවා (Baileys format)
         const msgToForward = {
             key: {
                 remoteJid: from,
@@ -51,14 +58,18 @@ cmd({
             message: context.quotedMessage
         };
 
-        // 4. මැසේජ් එක යැවීම (Baileys Standard Method)
+        // 4. මැසේජ් එක යැවීම (Standard Baileys Method)
         await bot.sendMessage(targetJid, { 
             forward: msgToForward, 
             force: true 
         });
 
         // 5. Success Message
-        await reply(`✅ *Forwarded Successfully!* \n\n📤 To: \`${targetJid}\``);
+        await reply(
+            `✅ *FORWARD SUCCESS*\n\n` + 
+            `📤 To: \`${targetJid}\`\n` +
+            `👑 King RANUX PRO`
+        );
 
     } catch (e) {
         console.log("FORWARD ERROR:", e);
