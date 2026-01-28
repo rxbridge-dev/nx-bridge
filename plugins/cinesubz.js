@@ -1,16 +1,19 @@
 const { cmd } = require("../command");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const puppeteer = require("puppeteer");
 
-// Session handling
+// 🔥 POWERFUL STEALTH MODE
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
+
 const pendingSearch = {};
 const pendingQuality = {};
 
 /* 
- 👑 King RANUX PRO – Cinesubz (Human-Like Mode)
- 🕵️‍♂️ Bypass: SonicCloud Anti-Bot & JS Injection
- 🚀 Logic: Stealth Puppeteer + API URL Calculation
+ 👑 King RANUX PRO – Cinesubz (Ultra Stealth Mode)
+ 🛡️ Bypass: Uses 'puppeteer-extra-plugin-stealth' to become undetectable
+ 🚀 Logic: Undetectable Browser + Smart Waiting
 */
 
 // --- 1. SEARCH FUNCTION ---
@@ -18,7 +21,7 @@ async function searchCinesubz(query) {
     try {
         const searchUrl = `https://cinesubz.net/?s=${encodeURIComponent(query)}`;
         const { data } = await axios.get(searchUrl, {
-            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36" }
+            headers: { "User-Agent": "Mozilla/5.0" }
         });
 
         const $ = cheerio.load(data);
@@ -36,7 +39,6 @@ async function searchCinesubz(query) {
         });
         return results.slice(0, 10);
     } catch (e) {
-        console.log("Search Error:", e);
         return [];
     }
 }
@@ -45,7 +47,7 @@ async function searchCinesubz(query) {
 async function getMovieInfo(url) {
     try {
         const { data } = await axios.get(url, {
-            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36" }
+            headers: { "User-Agent": "Mozilla/5.0" }
         });
         const $ = cheerio.load(data);
         const title = $(".details-title h3").text().trim() || "Unknown";
@@ -73,7 +75,7 @@ async function getMovieInfo(url) {
     }
 }
 
-// --- 3. BYPASS API PAGE (Pure Logic) ---
+// --- 3. BYPASS API PAGE ---
 async function bypassApiPage(apiLink) {
     try {
         const { data } = await axios.get(apiLink, { headers: { "User-Agent": "Mozilla/5.0" } });
@@ -81,7 +83,6 @@ async function bypassApiPage(apiLink) {
         if (!fakeLinkMatch) return null;
         
         let targetUrl = fakeLinkMatch[1];
-        // Based on the HTML you provided, these are the server mappings
         const mappings = [
             { s: "server11", r: "server1" }, { s: "server12", r: "server1" }, { s: "server13", r: "server1" },
             { s: "server21", r: "server2" }, { s: "server22", r: "server2" }, { s: "server23", r: "server2" },
@@ -101,61 +102,53 @@ async function bypassApiPage(apiLink) {
     }
 }
 
-// --- 4. SONIC CLOUD STEALTH CLICKER (The Strong Part) ---
+// --- 4. SONIC CLOUD ULTRA STEALTH (The Trick) ---
 async function getFinalGDrive(sonicUrl) {
+    // Launch with stealth plugin enabled
     const browser = await puppeteer.launch({ 
         headless: "new",
         args: [
             "--no-sandbox", 
             "--disable-setuid-sandbox", 
-            "--disable-blink-features=AutomationControlled", // Hides that it is controlled by automation
-            "--disable-web-security",
-            "--disable-features=IsolateOrigins,site-per-process"
+            "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
+            "--no-first-run",
+            "--no-zygote",
+            "--single-process", 
+            "--disable-gpu"
         ]
     });
     const page = await browser.newPage();
     let finalUrl = null;
 
     try {
-        // --- 4.1 Masking as Human ---
-        await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-        await page.evaluateOnNewDocument(() => {
-            // Remove 'navigator.webdriver' property to trick anti-bot scripts
-            Object.defineProperty(navigator, 'webdriver', { get: () => false });
-        });
-
-        console.log("🚀 Stealth Mode: Visiting SonicCloud...");
+        console.log("🚀 Stealth Mode Activated: Visiting SonicCloud...");
         
-        // --- 4.2 Network Interceptor ---
         await page.setRequestInterception(true);
         page.on('request', request => {
             const url = request.url();
             if (url.includes("drive.google.com") || url.includes("googleusercontent.com") || url.includes("export=download")) {
                 finalUrl = url;
-                console.log("🔥 Captured GDrive Link:", url);
+                console.log("🎉 Captured Link:", url);
                 request.abort();
             } else {
                 request.continue();
             }
         });
 
-        // --- 4.3 Load Page & Wait for JS ---
-        // waitUntil: 'networkidle2' waits until the JS has finished fetching the buttons
+        // Set realistic headers
+        await page.setExtraHTTPHeaders({
+            'Accept-Language': 'en-US,en;q=0.9'
+        });
+
         await page.goto(sonicUrl, { waitUntil: "networkidle2", timeout: 60000 });
 
-        // Wait specifically for the buttons to be injected into #dl-links
-        // If this times out, it means the site detected the bot or JS failed
-        try {
-            await page.waitForSelector('#dl-links a, #dl-links button', { timeout: 15000 });
-        } catch (e) {
-            console.log("⚠️ Button selector timeout. Attempting to click blindly...");
-        }
+        // WAIT TRICK: Wait a bit for Anti-Bot scripts to finish checks
+        await new Promise(r => setTimeout(r, 5000));
 
-        // --- 4.4 Find & Click "Google Download" ---
-        const clickedMain = await page.evaluate(() => {
-            // Get all buttons on the page
-            const buttons = Array.from(document.querySelectorAll("button, a, div.button"));
-            // Find the one that has "Google" in text
+        // Click "Google Download" using Evaluate (More human-like)
+        const clicked = await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll("button, a"));
             const target = buttons.find(b => b.innerText && b.innerText.toLowerCase().includes("google"));
             if (target) {
                 target.click();
@@ -164,27 +157,20 @@ async function getFinalGDrive(sonicUrl) {
             return false;
         });
 
-        if (!clickedMain) console.log("⚠️ Could not find 'Google' button via text.");
+        if (!clicked) console.log("⚠️ Failed to click main button.");
 
-        // --- 4.5 Handle Popup ---
-        // Wait for popup container to appear
-        await new Promise(r => setTimeout(r, 2500));
+        // Wait for popup
+        await new Promise(r => setTimeout(r, 3000));
 
+        // Click Popup Download
         await page.evaluate(() => {
-            // Try to find the specific popup button by ID (from your source code)
-            const specificBtn = document.getElementById("google-alert");
-            if (specificBtn) {
-                specificBtn.click();
-            } else {
-                // Fallback: Find any button that says "Download" inside a modal
-                const btns = Array.from(document.querySelectorAll(".custom-alert button, .modal button"));
-                const dlBtn = btns.find(b => b.innerText.trim() === "Download");
-                if (dlBtn) dlBtn.click();
-            }
+            const btns = Array.from(document.querySelectorAll("button"));
+            const dlBtn = btns.find(b => b.innerText.trim() === "Download");
+            if (dlBtn) dlBtn.click();
         });
 
-        // --- 4.6 Wait for Link Capture ---
-        await new Promise(r => setTimeout(r, 8000));
+        // Wait for capture
+        await new Promise(r => setTimeout(r, 10000));
 
     } catch (e) {
         console.log("Puppeteer Error:", e.message);
@@ -286,18 +272,15 @@ cmd({
     const linkData = info.links[index];
     delete pendingQuality[sender];
 
-    await reply(`🚀 *Generating Link...* \n(Auto-Bypassing SonicCloud...)\n\n🎬 Movie: ${info.title}\n📊 Quality: ${linkData.quality}`);
+    await reply(`🚀 *Processing...* (Ultra Stealth Mode)\nMovie: ${info.title}\nQuality: ${linkData.quality}`);
 
     try {
-        // Step 1: Instant Bypass API Page
         const sonicLink = await bypassApiPage(linkData.link);
         if (!sonicLink) return reply("❌ Failed to resolve SonicCloud link.");
 
-        // Step 2: Stealth Puppeteer SonicCloud -> GDrive
         const gDriveRaw = await getFinalGDrive(sonicLink);
-        if (!gDriveRaw) return reply("❌ Failed to grab GDrive link from SonicCloud (Detection or Timeout).");
+        if (!gDriveRaw) return reply("❌ Failed to grab GDrive link (Security too high).");
 
-        // Step 3: GDrive "Download Anyway" Bypass
         const finalDirectLink = await processGDriveLink(gDriveRaw);
 
         await reply("✅ *Uploading Movie...* 📤");
@@ -311,6 +294,6 @@ cmd({
 
     } catch (e) {
         console.log(e);
-        reply("❌ Upload Error. (File >2GB or Server busy).");
+        reply("❌ Upload Error.");
     }
 });
