@@ -8,11 +8,12 @@ const pendingSearch = {};
 const pendingQuality = {};
 
 /* 
- 👑 King RANUX PRO – Cinesubz Downloader (Ultimate Fixed)
+ 👑 King RANUX PRO – Cinesubz Downloader (Final Complete)
  ⚙️ Logic: 
-    1. Search via Axios (Fast)
-    2. API Page Bypass via JS Logic (Instant - No waiting)
-    3. SonicCloud Bypass via Puppeteer (Auto Clicker)
+    1. Search & Info (Axios)
+    2. API Bypass (NodeJS Logic)
+    3. Sonic Cloud Popup Handling (Puppeteer)
+    4. Google Drive Virus Scan Bypass (Axios)
 */
 
 // --- 1. SEARCH FUNCTION ---
@@ -20,11 +21,8 @@ async function searchCinesubz(query) {
     try {
         const searchUrl = `https://cinesubz.net/?s=${encodeURIComponent(query)}`;
         const { data } = await axios.get(searchUrl, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
-            }
+            headers: { "User-Agent": "Mozilla/5.0" }
         });
-
         const $ = cheerio.load(data);
         const results = [];
 
@@ -38,7 +36,6 @@ async function searchCinesubz(query) {
                 results.push({ id: i + 1, title: title.trim(), url, thumb, imdb });
             }
         });
-
         return results.slice(0, 10);
     } catch (e) {
         console.log("Search Error:", e);
@@ -50,11 +47,8 @@ async function searchCinesubz(query) {
 async function getMovieInfo(url) {
     try {
         const { data } = await axios.get(url, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
-            }
+            headers: { "User-Agent": "Mozilla/5.0" }
         });
-        
         const $ = cheerio.load(data);
         const title = $(".details-title h3").text().trim() || "Unknown";
         const image = $(".content-poster img").attr("src");
@@ -75,30 +69,20 @@ async function getMovieInfo(url) {
                 links.push({ quality, size: metaInfo.split("•")[1]?.trim() || "N/A", link });
             }
         });
-
         return { title, image, desc, links };
-
     } catch (e) {
-        console.log("Info Error:", e);
         throw new Error("Failed to fetch movie details.");
     }
 }
 
-// --- 3. BYPASS API PAGE (Instant Logic - No Browser Needed) ---
+// --- 3. BYPASS API PAGE ---
 async function bypassApiPage(apiLink) {
     try {
-        // Fetch the API Page
-        const { data } = await axios.get(apiLink, {
-            headers: { "User-Agent": "Mozilla/5.0" }
-        });
-
-        // Extract the hidden 'google.com' link
+        const { data } = await axios.get(apiLink, { headers: { "User-Agent": "Mozilla/5.0" } });
         const fakeLinkMatch = data.match(/href="(https:\/\/google\.com\/[^"]+)"/);
-        if (!fakeLinkMatch) throw new Error("Base link not found in API page");
+        if (!fakeLinkMatch) return null;
         
         let targetUrl = fakeLinkMatch[1];
-
-        // This Logic is extracted from the HTML you provided (URL Replacement)
         const mappings = [
             { s: "server11", r: "server1" }, { s: "server12", r: "server1" }, { s: "server13", r: "server1" },
             { s: "server21", r: "server2" }, { s: "server22", r: "server2" }, { s: "server23", r: "server2" },
@@ -111,38 +95,32 @@ async function bypassApiPage(apiLink) {
                 break; 
             }
         }
-
-        // Add extensions if needed (as per script)
         if (targetUrl.includes(".mp4") && !targetUrl.includes("?ext=")) targetUrl = targetUrl.replace(".mp4", "?ext=mp4");
-        
-        console.log("✅ Resolved Sonic URL:", targetUrl);
         return targetUrl;
-
     } catch (e) {
-        console.log("API Bypass Error:", e.message);
         return null;
     }
 }
 
-// --- 4. SONIC CLOUD BYPASS (Puppeteer) ---
+// --- 4. SONIC CLOUD AUTOMATION (Puppeteer) ---
 async function getFinalGDrive(sonicUrl) {
     const browser = await puppeteer.launch({ 
         headless: "new",
         args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-popup-blocking"]
     });
     const page = await browser.newPage();
-    let finalUrl = null;
+    let capturedLink = null;
 
     try {
-        console.log("🚀 Puppeteer: Visiting SonicCloud...");
+        console.log("🚀 Visiting SonicCloud:", sonicUrl);
         
+        // Intercept the GDrive Link when the popup button is clicked
         await page.setRequestInterception(true);
         page.on('request', request => {
             const url = request.url();
-            // Capture any GDrive link
-            if (url.includes("drive.google.com") || url.includes("googleusercontent.com") || url.includes("export=download")) {
-                finalUrl = url;
-                console.log("🎉 Captured Link:", url);
+            if (url.includes("drive.google.com") || url.includes("googleusercontent.com")) {
+                capturedLink = url;
+                console.log("🔥 Captured GDrive Link:", url);
                 request.abort();
             } else {
                 request.continue();
@@ -151,26 +129,28 @@ async function getFinalGDrive(sonicUrl) {
 
         await page.goto(sonicUrl, { waitUntil: "networkidle2", timeout: 60000 });
 
-        // CLICK: "Google Download 1" or "Google Download 2"
+        // 1. Click "Google Download" (The Purple Button)
         await page.evaluate(() => {
             const buttons = Array.from(document.querySelectorAll("button, a"));
-            // Find ANY button that says "Google Download"
-            const targetBtn = buttons.find(b => b.textContent.toLowerCase().includes("google download"));
-            if (targetBtn) targetBtn.click();
+            const gButton = buttons.find(b => b.innerText && b.innerText.toLowerCase().includes("google download"));
+            if (gButton) gButton.click();
         });
 
-        // Wait for Modal/Popup
-        await new Promise(r => setTimeout(r, 2500));
-        
-        // CLICK: "Download" inside the popup
+        // 2. Wait for the Modal (The Popup you showed)
+        // We wait for the modal container to be visible
+        await new Promise(r => setTimeout(r, 2000));
+
+        // 3. Click "Download" INSIDE the Modal
         await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll("button, a"));
-            const dlBtn = btns.find(b => b.textContent.trim().toUpperCase() === "DOWNLOAD");
+            // Find all buttons
+            const buttons = Array.from(document.querySelectorAll("button"));
+            // Filter for the one that says exactly "Download" inside the popup structure
+            const dlBtn = buttons.find(b => b.innerText && b.innerText.trim() === "Download");
             if (dlBtn) dlBtn.click();
         });
 
-        // Wait for capture
-        await new Promise(r => setTimeout(r, 10000));
+        // 4. Wait for the link capture
+        await new Promise(r => setTimeout(r, 8000));
 
     } catch (e) {
         console.log("Puppeteer Error:", e.message);
@@ -178,7 +158,43 @@ async function getFinalGDrive(sonicUrl) {
         await browser.close();
     }
 
-    return finalUrl;
+    return capturedLink;
+}
+
+// --- 5. GDRIVE "DOWNLOAD ANYWAY" BYPASS ---
+async function processGDriveLink(gDriveUrl) {
+    try {
+        // If it's already a direct usercontent link, return it
+        if (gDriveUrl.includes("googleusercontent.com")) return gDriveUrl;
+
+        // Fetch the GDrive page to check for "Virus Scan / Download Anyway"
+        const { data, headers } = await axios.get(gDriveUrl, {
+            headers: { "User-Agent": "Mozilla/5.0" }
+        });
+
+        // If it returns a file directly (check content-type), return the URL
+        if (headers['content-type'] && headers['content-type'].includes("video")) {
+            return gDriveUrl;
+        }
+
+        // Check for "Download anyway" confirm token
+        if (data.includes("download_warning")) {
+            const match = data.match(/confirm=([a-zA-Z0-9_]+)/);
+            if (match) {
+                const confirmCode = match[1];
+                // Construct the final download link
+                const finalUrl = gDriveUrl.includes("?") 
+                    ? `${gDriveUrl}&confirm=${confirmCode}`
+                    : `${gDriveUrl}?confirm=${confirmCode}`;
+                return finalUrl;
+            }
+        }
+        
+        return gDriveUrl; // Return original if no warning found
+    } catch (e) {
+        console.log("GDrive Process Error:", e.message);
+        return gDriveUrl;
+    }
 }
 
 // --- COMMANDS ---
@@ -211,7 +227,6 @@ cmd({
     await bot.sendMessage(from, { image: { url: results[0].thumb }, caption: msg }, { quoted: mek });
 });
 
-// Select Movie
 cmd({
     filter: (text, { sender }) => pendingSearch[sender] && !isNaN(text) && parseInt(text) > 0 && parseInt(text) <= pendingSearch[sender].results.length
 }, async (bot, mek, m, { body, sender, reply, from }) => {
@@ -243,7 +258,6 @@ cmd({
     }
 });
 
-// Select Quality & Download
 cmd({
     filter: (text, { sender }) => pendingQuality[sender] && !isNaN(text) && parseInt(text) > 0 && parseInt(text) <= pendingQuality[sender].info.links.length
 }, async (bot, mek, m, { body, sender, reply, from }) => {
@@ -253,23 +267,24 @@ cmd({
     const linkData = info.links[index];
     delete pendingQuality[sender];
 
-    await reply(`🚀 *Generating Link...* \nQuality: ${linkData.quality}\n\n(Wait: Bypassing Cinesubz & SonicCloud systems...)`);
+    await reply(`🚀 *Generating Link...* \n(Please wait ~30s)\n\n🎬 Movie: ${info.title}\n📊 Quality: ${linkData.quality}`);
 
     try {
-        // Step 1: Instant Bypass API Page
+        // 1. API Page Bypass
         const sonicLink = await bypassApiPage(linkData.link);
-        
         if (!sonicLink) return reply("❌ Failed to resolve SonicCloud link.");
 
-        // Step 2: Puppeteer Bypass SonicCloud -> GDrive
-        const gDriveLink = await getFinalGDrive(sonicLink);
+        // 2. Sonic Cloud -> GDrive (Puppeteer Popup Clicker)
+        const gDriveRaw = await getFinalGDrive(sonicLink);
+        if (!gDriveRaw) return reply("❌ Failed to grab GDrive link from SonicCloud.");
 
-        if (!gDriveLink) return reply("❌ *Failed to extract Link.*\n(Google Drive might be down or file deleted).");
+        // 3. GDrive "Download Anyway" Bypass
+        const finalDirectLink = await processGDriveLink(gDriveRaw);
 
-        await reply("✅ *Link Found! Uploading...* 📤");
+        await reply("✅ *Uploading Movie...* 📤");
 
         await bot.sendMessage(from, {
-            document: { url: gDriveLink },
+            document: { url: finalDirectLink },
             mimetype: "video/mp4",
             fileName: `${info.title} - ${linkData.quality}.mp4`,
             caption: `🎬 *${info.title}*\n📊 ${linkData.quality}\n📦 ${linkData.size}\n\n👑 King RANUX PRO`
@@ -277,6 +292,6 @@ cmd({
 
     } catch (e) {
         console.log(e);
-        reply("❌ Upload Error. (File might be too big).");
+        reply("❌ Upload Error. File might be too large (>2GB) or connection failed.");
     }
 });
