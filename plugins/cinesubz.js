@@ -8,12 +8,11 @@ const pendingSearch = {};
 const pendingQuality = {};
 
 /* 
- 👑 King RANUX PRO – Cinesubz Downloader (Final Complete)
- ⚙️ Logic: 
-    1. Search & Info (Axios)
-    2. API Bypass (NodeJS Logic)
-    3. Sonic Cloud Popup Handling (Puppeteer)
-    4. Google Drive Virus Scan Bypass (Axios)
+ 👑 King RANUX PRO – Cinesubz Downloader (Fixed for Popup & New Tabs)
+ ⚙️ Fixes: 
+    - Targets '#google-alert' button specifically.
+    - Captures links opened in New Tabs.
+    - Handles 'Download Anyway' confirmation.
 */
 
 // --- 1. SEARCH FUNCTION ---
@@ -102,55 +101,79 @@ async function bypassApiPage(apiLink) {
     }
 }
 
-// --- 4. SONIC CLOUD AUTOMATION (Puppeteer) ---
+// --- 4. SONIC CLOUD AUTOMATION (Fixed for Popup & New Tab) ---
 async function getFinalGDrive(sonicUrl) {
     const browser = await puppeteer.launch({ 
         headless: "new",
         args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-popup-blocking"]
     });
     const page = await browser.newPage();
-    let capturedLink = null;
+    let finalUrl = null;
 
     try {
-        console.log("🚀 Visiting SonicCloud:", sonicUrl);
+        console.log("🚀 Puppeteer: Visiting SonicCloud...");
         
-        // Intercept the GDrive Link when the popup button is clicked
+        // 1. Setup Request Interception (For current page redirects)
         await page.setRequestInterception(true);
         page.on('request', request => {
             const url = request.url();
-            if (url.includes("drive.google.com") || url.includes("googleusercontent.com")) {
-                capturedLink = url;
-                console.log("🔥 Captured GDrive Link:", url);
+            if (url.includes("drive.google.com") || url.includes("googleusercontent.com") || url.includes("export=download")) {
+                finalUrl = url;
                 request.abort();
             } else {
                 request.continue();
             }
         });
 
+        // 2. Setup New Target Listener (For New Tabs)
+        browser.on('targetcreated', async (target) => {
+            const url = target.url();
+            if (url.includes("drive.google.com") || url.includes("googleusercontent.com")) {
+                finalUrl = url;
+                console.log("🎉 Captured Link from New Tab:", url);
+                const newPage = await target.page();
+                if (newPage) await newPage.close(); // Close the new tab
+            }
+        });
+
         await page.goto(sonicUrl, { waitUntil: "networkidle2", timeout: 60000 });
 
-        // 1. Click "Google Download" (The Purple Button)
-        await page.evaluate(() => {
-            const buttons = Array.from(document.querySelectorAll("button, a"));
-            const gButton = buttons.find(b => b.innerText && b.innerText.toLowerCase().includes("google download"));
-            if (gButton) gButton.click();
+        // 3. Wait for Loading Screen to disappear (from Source Code)
+        try {
+            await page.waitForSelector('#loading-screen', { hidden: true, timeout: 5000 });
+        } catch (e) {}
+
+        // 4. Click Main "Google Download" Button
+        // Source code implies buttons are in #dl-links
+        await page.waitForSelector('#dl-links button', { timeout: 10000 });
+        const clickedMain = await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll("#dl-links button, #dl-links a"));
+            const target = buttons.find(b => b.innerText.includes("Google"));
+            if (target) {
+                target.click();
+                return true;
+            }
+            return false;
         });
 
-        // 2. Wait for the Modal (The Popup you showed)
-        // We wait for the modal container to be visible
+        if (!clickedMain) console.log("⚠️ Main button not found, trying generic click...");
+
+        // 5. Wait for Popup (#custom-alert-google)
         await new Promise(r => setTimeout(r, 2000));
 
-        // 3. Click "Download" INSIDE the Modal
+        // 6. Click The Popup "Download" Button (ID: google-alert)
+        console.log("🔄 Clicking Popup Button (#google-alert)...");
         await page.evaluate(() => {
-            // Find all buttons
-            const buttons = Array.from(document.querySelectorAll("button"));
-            // Filter for the one that says exactly "Download" inside the popup structure
-            const dlBtn = buttons.find(b => b.innerText && b.innerText.trim() === "Download");
-            if (dlBtn) dlBtn.click();
+            const btn = document.getElementById("google-alert");
+            if (btn) btn.click();
         });
 
-        // 4. Wait for the link capture
-        await new Promise(r => setTimeout(r, 8000));
+        // 7. Wait for Link Capture
+        // Wait longer because new tabs might take a moment to initialize
+        for (let i = 0; i < 10; i++) {
+            if (finalUrl) break;
+            await new Promise(r => setTimeout(r, 1000));
+        }
 
     } catch (e) {
         console.log("Puppeteer Error:", e.message);
@@ -158,41 +181,27 @@ async function getFinalGDrive(sonicUrl) {
         await browser.close();
     }
 
-    return capturedLink;
+    return finalUrl;
 }
 
-// --- 5. GDRIVE "DOWNLOAD ANYWAY" BYPASS ---
+// --- 5. GDRIVE PROCESSOR ---
 async function processGDriveLink(gDriveUrl) {
     try {
-        // If it's already a direct usercontent link, return it
+        if (!gDriveUrl) return null;
         if (gDriveUrl.includes("googleusercontent.com")) return gDriveUrl;
 
-        // Fetch the GDrive page to check for "Virus Scan / Download Anyway"
-        const { data, headers } = await axios.get(gDriveUrl, {
-            headers: { "User-Agent": "Mozilla/5.0" }
-        });
+        const { data } = await axios.get(gDriveUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
 
-        // If it returns a file directly (check content-type), return the URL
-        if (headers['content-type'] && headers['content-type'].includes("video")) {
-            return gDriveUrl;
-        }
-
-        // Check for "Download anyway" confirm token
         if (data.includes("download_warning")) {
             const match = data.match(/confirm=([a-zA-Z0-9_]+)/);
             if (match) {
-                const confirmCode = match[1];
-                // Construct the final download link
-                const finalUrl = gDriveUrl.includes("?") 
-                    ? `${gDriveUrl}&confirm=${confirmCode}`
-                    : `${gDriveUrl}?confirm=${confirmCode}`;
-                return finalUrl;
+                return gDriveUrl.includes("?") 
+                    ? `${gDriveUrl}&confirm=${match[1]}`
+                    : `${gDriveUrl}?confirm=${match[1]}`;
             }
         }
-        
-        return gDriveUrl; // Return original if no warning found
+        return gDriveUrl;
     } catch (e) {
-        console.log("GDrive Process Error:", e.message);
         return gDriveUrl;
     }
 }
@@ -238,7 +247,6 @@ cmd({
 
     try {
         const info = await getMovieInfo(movie.url);
-        
         if (!info.links.length) return reply("❌ Download links not available.");
 
         pendingQuality[sender] = { info, timestamp: Date.now() };
@@ -254,7 +262,7 @@ cmd({
         await bot.sendMessage(from, { image: { url: info.image }, caption: msg }, { quoted: mek });
 
     } catch (e) {
-        reply("❌ Error fetching movie details.");
+        reply("❌ Error fetching details.");
     }
 });
 
@@ -267,18 +275,18 @@ cmd({
     const linkData = info.links[index];
     delete pendingQuality[sender];
 
-    await reply(`🚀 *Generating Link...* \n(Please wait ~30s)\n\n🎬 Movie: ${info.title}\n📊 Quality: ${linkData.quality}`);
+    await reply(`🚀 *Processing...* (Bypassing Systems)\nMovie: ${info.title}\nQuality: ${linkData.quality}`);
 
     try {
-        // 1. API Page Bypass
+        // Step 1
         const sonicLink = await bypassApiPage(linkData.link);
-        if (!sonicLink) return reply("❌ Failed to resolve SonicCloud link.");
+        if (!sonicLink) return reply("❌ Failed to bypass API page.");
 
-        // 2. Sonic Cloud -> GDrive (Puppeteer Popup Clicker)
+        // Step 2
         const gDriveRaw = await getFinalGDrive(sonicLink);
         if (!gDriveRaw) return reply("❌ Failed to grab GDrive link from SonicCloud.");
 
-        // 3. GDrive "Download Anyway" Bypass
+        // Step 3
         const finalDirectLink = await processGDriveLink(gDriveRaw);
 
         await reply("✅ *Uploading Movie...* 📤");
@@ -292,6 +300,6 @@ cmd({
 
     } catch (e) {
         console.log(e);
-        reply("❌ Upload Error. File might be too large (>2GB) or connection failed.");
+        reply("❌ Upload Error. (File >2GB or Server busy).");
     }
 });
