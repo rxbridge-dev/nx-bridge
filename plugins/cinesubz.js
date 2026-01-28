@@ -1,23 +1,22 @@
 const { cmd } = require("../command");
-const puppeteer = require("puppeteer");
 const axios = require("axios");
 const cheerio = require("cheerio");
+const puppeteer = require("puppeteer");
 
 // Session handling
 const pendingSearch = {};
 const pendingQuality = {};
 
 /* 
- 👑 King RANUX PRO – Cinesubz Downloader (Fixed)
- ⚙️ Tech: Axios/Cheerio (Search) + Puppeteer (Bypass)
- 🚀 Fixes: "No results found" error & Faster Scraping
+ 👑 King RANUX PRO – Cinesubz Downloader (Final Fixed)
+ ⚙️ Engine: Axios (Search) + Logic (API Bypass) + Puppeteer (SonicCloud)
+ 🛠️ Fixes: Corrected CSS Selectors based on provided HTML source
 */
 
-// --- 1. SEARCH FUNCTION (Updated to Axios + Cheerio) ---
+// --- 1. SEARCH FUNCTION (Fixed Selectors) ---
 async function searchCinesubz(query) {
     try {
         const searchUrl = `https://cinesubz.net/?s=${encodeURIComponent(query)}`;
-        // User-Agent දානවා Browser එකක් වගේ පෙන්නන්න
         const { data } = await axios.get(searchUrl, {
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
@@ -27,32 +26,34 @@ async function searchCinesubz(query) {
         const $ = cheerio.load(data);
         const results = [];
 
-        // Cinesubz Structure එකේ ෆිල්ම් තියෙන තැන් ස්කෑන් කරනවා
-        // (.result-item, article, .item කියන class තුනම check කරනවා)
-        $(".result-item, article, .item").each((i, el) => {
-            const title = $(el).find(".title, .entry-title").text().trim();
-            const url = $(el).find("a").attr("href");
-            const thumb = $(el).find("img").attr("src");
+        // Correct Selector based on your HTML source: .display-item
+        $(".display-item").each((i, el) => {
+            const title = $(el).find(".item-box a").attr("title") || $(el).find("h3").text();
+            const url = $(el).find(".item-box a").attr("href");
+            const thumb = $(el).find("img").attr("src") || $(el).find("img").attr("data-original");
+            const imdb = $(el).find(".imdb-score").text().trim();
+            const year = $(el).find(".movie-date").text().trim();
 
             if (title && url) {
                 results.push({
                     id: i + 1,
-                    title: title,
+                    title: title.trim(),
                     url: url,
-                    thumb: thumb || "",
-                    type: "Movie"
+                    thumb: thumb,
+                    imdb: imdb,
+                    year: year
                 });
             }
         });
 
-        return results.slice(0, 10); // Top 10 results
+        return results.slice(0, 10);
     } catch (e) {
         console.log("Search Error:", e);
         return [];
     }
 }
 
-// --- 2. METADATA & LINK EXTRACTOR (Axios + Cheerio) ---
+// --- 2. MOVIE DETAILS (Fixed Selectors) ---
 async function getMovieInfo(url) {
     try {
         const { data } = await axios.get(url, {
@@ -63,39 +64,36 @@ async function getMovieInfo(url) {
         
         const $ = cheerio.load(data);
         
-        const title = $(".entry-title").text().trim() || "Unknown Title";
-        const imdb = $(".imdb-rating").text().trim() || "N/A";
-        const image = $(".entry-content img").first().attr("src") || "";
-        const desc = $(".entry-content p").first().text().trim().substring(0, 200) + "...";
+        const title = $(".details-title h3").text().trim() || "Unknown";
+        const image = $(".content-poster img").attr("src");
+        const desc = $(".details-desc p").first().text().trim();
+        const imdb = $(".data-imdb").text().replace("IMDb:", "").trim();
 
-        // Download Links සොයා ගැනීම
+        // Extract Links from .movie-download-button
         const links = [];
-        $("a").each((i, el) => {
-            const href = $(el).attr("href");
-            const text = $(el).text().toUpperCase();
+        $(".movie-download-link-item").each((i, el) => {
+            const a = $(el).find("a.movie-download-button");
+            const link = a.attr("href");
+            
+            // Extract Quality info from .movie-download-meta
+            const metaInfo = $(el).find(".movie-download-meta").text().trim(); // e.g., "WEB-DL 480p • 700 MB • Tamil"
+            
+            // Guess quality from meta info
+            let quality = "Unknown";
+            if (metaInfo.includes("1080p")) quality = "1080p (FHD)";
+            else if (metaInfo.includes("720p")) quality = "720p (HD)";
+            else if (metaInfo.includes("480p")) quality = "480p (SD)";
 
-            // Link එක API එකට හෝ Sonic Cloud එකට යනවද බලනවා
-            if (href && (href.includes("cinesubz.lk/api") || href.includes("sonic-cloud"))) {
-                let quality = "SD";
-                if (text.includes("1080")) quality = "1080p (FHD)";
-                else if (text.includes("720")) quality = "720p (HD)";
-                else if (text.includes("480")) quality = "480p (SD)";
-                
-                links.push({ quality, link: href });
+            if (link && link.includes("cinesubz.lk/api")) {
+                links.push({
+                    quality: quality,
+                    size: metaInfo.split("•")[1]?.trim() || "N/A", // Extract size
+                    link: link
+                });
             }
         });
 
-        // Duplicates ඉවත් කිරීම
-        const uniqueLinks = [];
-        const seen = new Set();
-        links.forEach(l => {
-            if (!seen.has(l.link)) {
-                uniqueLinks.push(l);
-                seen.add(l.link);
-            }
-        });
-
-        return { title, imdb, image, desc, links: uniqueLinks };
+        return { title, image, desc, imdb, links };
 
     } catch (e) {
         console.log("Info Error:", e);
@@ -103,73 +101,102 @@ async function getMovieInfo(url) {
     }
 }
 
-// --- 3. LINK BYPASS (Puppeteer - Only used here) ---
-async function getFinalGoogleDriveLink(initialLink) {
+// --- 3. BYPASSING THE API PAGE (Logic from Source) ---
+async function resolveApiLink(apiLink) {
+    try {
+        // Step 1: Fetch the API page HTML
+        const { data } = await axios.get(apiLink, {
+            headers: { "User-Agent": "Mozilla/5.0" }
+        });
+
+        // Step 2: Extract the fake 'google.com' link
+        const fakeLinkMatch = data.match(/href="(https:\/\/google\.com\/[^"]+)"/);
+        if (!fakeLinkMatch) throw new Error("Base link not found in API page");
+        
+        let targetUrl = fakeLinkMatch[1];
+
+        // Step 3: Apply the JS replacement logic (Replicating the script in your HTML)
+        // Mapping: google.com/server21 -> bot2.sonic-cloud.online/server2
+        
+        const replacements = [
+            { s: "server11", r: "server1" }, { s: "server12", r: "server1" }, { s: "server13", r: "server1" },
+            { s: "server21", r: "server2" }, { s: "server22", r: "server2" }, { s: "server23", r: "server2" },
+            { s: "server3", r: "server3" }, { s: "server4", r: "server4" }, { s: "server5", r: "server5" }, { s: "server6", r: "server6" }
+        ];
+
+        let replaced = false;
+        for (const map of replacements) {
+            if (targetUrl.includes(map.s + "/1:/")) {
+                targetUrl = targetUrl.replace("google.com/" + map.s + "/1:/", "bot2.sonic-cloud.online/" + map.r + "/");
+                replaced = true;
+                break;
+            }
+        }
+
+        // Fix extensions as per script
+        if (targetUrl.includes(".mp4")) targetUrl = targetUrl.replace(".mp4", "?ext=mp4");
+        
+        console.log("✅ Resolved SonicCloud URL:", targetUrl);
+        return targetUrl;
+
+    } catch (e) {
+        console.log("API Resolve Error:", e.message);
+        return null;
+    }
+}
+
+// --- 4. SONIC CLOUD -> GDRIVE (Puppeteer) ---
+async function getFinalGDrive(sonicUrl) {
     const browser = await puppeteer.launch({ 
-        headless: true, // Server එකේ run වෙන්න "new" හෝ true දාන්න
+        headless: true, // Server friendly
         args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-popup-blocking"]
     });
     const page = await browser.newPage();
     let finalUrl = null;
 
     try {
-        console.log("🔄 Bypassing: Visiting API Link...");
-        await page.goto(initialLink, { waitUntil: "networkidle2", timeout: 60000 });
-
-        // --- STEP 1: Cinesubz API Page ---
-        // Wait for potential timer
-        await new Promise(r => setTimeout(r, 4000));
-
-        // Find SonicCloud Link
-        const sonicUrl = await page.evaluate(() => {
-            const anchors = Array.from(document.querySelectorAll("a"));
-            const target = anchors.find(a => a.href.includes("sonic-cloud"));
-            return target ? target.href : null;
-        });
-
-        if (!sonicUrl) throw new Error("SonicCloud redirect link not found.");
-
-        console.log("🔄 Bypassing: Visiting SonicCloud...");
-        await page.goto(sonicUrl, { waitUntil: "domcontentloaded" });
-
-        // --- STEP 2: Sonic Cloud ---
-        // Setup Request Interception to catch GDrive Link
+        console.log("🚀 Puppeteer: Navigating to SonicCloud...");
+        
+        // Setup Interception
         await page.setRequestInterception(true);
         page.on('request', request => {
             const url = request.url();
-            // Google Drive Link එකක් දැක්ක ගමන් අල්ලගන්නවා
+            // Google Drive or Google User Content
             if (url.includes("drive.google.com") || url.includes("googleusercontent.com")) {
                 finalUrl = url;
-                console.log("✅ Final Link Captured:", url);
+                console.log("🎉 Captured GDrive Link!");
                 request.abort();
             } else {
                 request.continue();
             }
         });
 
-        // Click Logic (Generic Text Matching)
+        await page.goto(sonicUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+
+        // Click "Google Download" button
+        // Based on screenshot, it's a purple button or similar
         await page.evaluate(() => {
-            // Find "Google Download 1" or any "Google" button
-            const buttons = Array.from(document.querySelectorAll("button, a, div"));
-            const gButton = buttons.find(b => b.textContent.toLowerCase().includes("google download"));
-            if (gButton) gButton.click();
+            const buttons = Array.from(document.querySelectorAll("button, a"));
+            // Find button with 'Google' text
+            const btn = buttons.find(b => b.innerText.toLowerCase().includes("google"));
+            if (btn) btn.click();
         });
 
-        // Wait for popup
+        // Wait for popup "Download"
         await new Promise(r => setTimeout(r, 2000));
-
+        
         await page.evaluate(() => {
-            // Click "Download" in popup
-            const allBtns = Array.from(document.querySelectorAll("button, a"));
-            const dlBtn = allBtns.find(b => b.textContent.trim() === "Download");
-            if (dlBtn) dlBtn.click();
+            // Click "Download" inside the modal
+            const btns = Array.from(document.querySelectorAll("button"));
+            const dl = btns.find(b => b.innerText.trim() === "Download");
+            if (dl) dl.click();
         });
 
-        // Wait for interceptor
+        // Wait for capture
         await new Promise(r => setTimeout(r, 8000));
 
     } catch (e) {
-        console.log("Bypass Error:", e.message);
+        console.log("Puppeteer Error:", e.message);
     } finally {
         await browser.close();
     }
@@ -177,118 +204,102 @@ async function getFinalGoogleDriveLink(initialLink) {
     return finalUrl;
 }
 
-// --- COMMAND HANDLERS ---
+// --- COMMANDS ---
 
 cmd({
     pattern: "cinesubz",
-    alias: ["cine", "movie2"],
+    alias: ["cine"],
     react: "🎬",
-    desc: "Search movies on Cinesubz.net",
+    desc: "Download movies from Cinesubz",
     category: "download",
     filename: __filename
 }, async (bot, mek, m, { from, q, reply, sender }) => {
     
-    if (!q) return reply("ℹ️ *Search Name එකක් දෙන්න.*\nඋදා: .cine Varisu");
+    if (!q) return reply("ℹ️ *Movie Name එකක් දෙන්න.*");
 
-    await reply("🔎 *Searching on Cinesubz...*");
+    await reply("🔎 *Searching Cinesubz...*");
     const results = await searchCinesubz(q);
 
-    if (!results.length) return reply("❌ *No results found.* (Try checking spelling)");
+    if (!results.length) return reply("❌ *No results found.*");
 
     pendingSearch[sender] = { results, timestamp: Date.now() };
 
-    let msg = "🎬 *CINESUBZ SEARCH RESULTS*\n\n";
+    let msg = "🎬 *CINESUBZ MOVIES*\n\n";
     results.forEach((r, i) => {
         msg += `*${i + 1}.* ${r.title}\n`;
+        msg += `   ⭐️ IMDb: ${r.imdb}\n`;
     });
-    msg += `\n🔢 *Reply with the number (1-${results.length})*`;
+    msg += `\n🔢 *Reply with number (1-${results.length})*`;
 
-    // Send with the thumb of the first result
     await bot.sendMessage(from, { image: { url: results[0].thumb }, caption: msg }, { quoted: mek });
 });
 
-// HANDLER 1: SELECT MOVIE
+// Select Movie
 cmd({
     filter: (text, { sender }) => pendingSearch[sender] && !isNaN(text) && parseInt(text) > 0 && parseInt(text) <= pendingSearch[sender].results.length
 }, async (bot, mek, m, { body, sender, reply, from }) => {
     
     await bot.sendMessage(from, { react: { text: "⏳", key: mek.key } });
-
     const index = parseInt(body.trim()) - 1;
-    const selectedMovie = pendingSearch[sender].results[index];
-    delete pendingSearch[sender]; 
-
-    await reply(`🔄 *Fetching Data for:*\n${selectedMovie.title}...`);
+    const movie = pendingSearch[sender].results[index];
+    delete pendingSearch[sender];
 
     try {
-        const metadata = await getMovieInfo(selectedMovie.url);
+        const info = await getMovieInfo(movie.url);
         
-        if (!metadata.links.length) return reply("❌ Download links not found.");
+        if (!info.links.length) return reply("❌ Download links not available.");
 
-        pendingQuality[sender] = { metadata, timestamp: Date.now() };
+        pendingQuality[sender] = { info, timestamp: Date.now() };
 
-        let msg = `🎬 *${metadata.title}*\n\n`;
-        msg += `⭐ IMDb: ${metadata.imdb}\n`;
-        msg += `📝 Desc: ${metadata.desc}\n\n`;
+        let msg = `🎬 *${info.title}*\n\n`;
+        msg += `📜 ${info.desc}\n\n`;
         msg += `⬇️ *Select Quality:*\n`;
 
-        metadata.links.forEach((l, i) => {
-            msg += `*${i + 1}.* ${l.quality}\n`;
+        info.links.forEach((l, i) => {
+            msg += `*${i + 1}.* ${l.quality} [${l.size}]\n`;
         });
-        msg += `\n🔢 *Reply with quality number.*`;
 
-        if (metadata.image) {
-            await bot.sendMessage(from, { image: { url: metadata.image }, caption: msg }, { quoted: mek });
-        } else {
-            await bot.sendMessage(from, { text: msg }, { quoted: mek });
-        }
+        await bot.sendMessage(from, { image: { url: info.image }, caption: msg }, { quoted: mek });
 
     } catch (e) {
-        console.log(e);
-        reply("❌ Error fetching details.");
+        reply("❌ Error fetching movie details.");
     }
 });
 
-// HANDLER 2: SELECT QUALITY & DOWNLOAD
+// Select Quality & Download
 cmd({
-    filter: (text, { sender }) => pendingQuality[sender] && !isNaN(text) && parseInt(text) > 0 && parseInt(text) <= pendingQuality[sender].metadata.links.length
+    filter: (text, { sender }) => pendingQuality[sender] && !isNaN(text) && parseInt(text) > 0 && parseInt(text) <= pendingQuality[sender].info.links.length
 }, async (bot, mek, m, { body, sender, reply, from }) => {
     
-    await bot.sendMessage(from, { react: { text: "⬇️", key: mek.key } });
-
     const index = parseInt(body.trim()) - 1;
-    const { metadata } = pendingQuality[sender];
-    const selectedLink = metadata.links[index];
-    
-    delete pendingQuality[sender]; 
+    const { info } = pendingQuality[sender];
+    const linkData = info.links[index];
+    delete pendingQuality[sender];
 
-    await reply(`🚀 *Bypassing Links...* (This may take 10-20s)\nSelected: ${selectedLink.quality}`);
+    await reply(`🚀 *Processing Link...* (Auto-Bypassing)\nQuality: ${linkData.quality}`);
 
     try {
-        const finalUrl = await getFinalGoogleDriveLink(selectedLink.link);
+        // 1. Resolve API Link -> Sonic Cloud Link (Using Logic)
+        const sonicLink = await resolveApiLink(linkData.link);
+        
+        if (!sonicLink) return reply("❌ Failed to resolve API link.");
 
-        if (!finalUrl) {
-            return reply("❌ *Failed to extract Direct Drive Link.*\n(Site structure might have changed).");
-        }
+        // 2. Sonic Cloud -> Google Drive (Using Puppeteer)
+        const gDriveLink = await getFinalGDrive(sonicLink);
 
-        await reply("✅ *Link Extracted! Uploading...*");
+        if (!gDriveLink) return reply("❌ Failed to grab GDrive link from SonicCloud.");
+
+        await reply("✅ *Uploading Movie...* 📤");
 
         await bot.sendMessage(from, {
-            document: { url: finalUrl },
+            document: { url: gDriveLink },
             mimetype: "video/mp4",
-            fileName: `${metadata.title} - ${selectedLink.quality}.mp4`,
-            caption: `🎬 *${metadata.title}*\n📊 ${selectedLink.quality}\n\n👑 King RANUX PRO`
+            fileName: `${info.title} - ${linkData.quality}.mp4`,
+            caption: `🎬 *${info.title}*\n📊 ${linkData.quality}\n📦 ${linkData.size}\n\n👑 King RANUX PRO`
         }, { quoted: mek });
 
     } catch (e) {
-        console.log("Download Error:", e);
-        reply("❌ *Upload Failed.*\nGoogle Drive Limit exceeded or File too large.");
+        console.log(e);
+        reply("❌ Upload Error. (File might be too big).");
     }
 });
-
-// Cleanup Sessions
-setInterval(() => {
-    const now = Date.now();
-    for (const s in pendingSearch) if (now - pendingSearch[s].timestamp > 600000) delete pendingSearch[s];
-    for (const s in pendingQuality) if (now - pendingQuality[s].timestamp > 600000) delete pendingQuality[s];
-}, 60000);
