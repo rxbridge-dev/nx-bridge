@@ -138,7 +138,7 @@ async function connectToWA() {
   const ranuxPro = makeWASocket({
     logger: P({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: Browsers.windows("Chrome"),
+    browser: Browsers.macOS("Safari"),
     auth: state,
     version,
     syncFullHistory: true,
