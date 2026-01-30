@@ -31,7 +31,7 @@ const FOOTER = `\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪�
 cmd(
   {
     pattern: "getpp",
-    alias: ["getdp", "pp", "jid"],
+    alias: ["getdp", "pp", "getpp"],
     desc: "Download user profile picture (Target Only)",
     category: "tools",
     react: "🖼️",
