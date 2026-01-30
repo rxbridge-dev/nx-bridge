@@ -1,85 +1,58 @@
 const { cmd } = require("../command");
 const os = require("os");
 const config = require("../config");
-const { ALIVE_MSG, ALIVE_IMG } = config;
 
-cmd(
-  {
+// 🔥 HARDCODED LOGO URL
+const LOGO_URL = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/king-ranux-pro-main-logo.png";
+
+cmd({
     pattern: "alive",
     desc: "Check bot status",
     category: "main",
-    react: "👑",
-    filename: __filename,
-  },
-  async (ranuxPro, mek, m, { from, reply }) => {
+    react: "⚜️",
+    filename: __filename
+},
+async (ranuxPro, mek, m, { from, reply }) => {
     try {
-      // React when command used
-      await ranuxPro.sendMessage(from, {
-        react: { text: "👑", key: mek.key }
-      });
+        // 1. React Command
+        await ranuxPro.sendMessage(from, { react: { text: "⚜️", key: mek.key } });
 
-      /* ───────────── TIME ───────────── */
-      const now = new Date();
-      const time = now.toLocaleTimeString("en-GB", {
-        timeZone: "Asia/Colombo",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
+        // 2. System Calculations
+        const uptimeSec = process.uptime();
+        const hrs = Math.floor(uptimeSec / 3600);
+        const mins = Math.floor((uptimeSec % 3600) / 60);
+        const secs = Math.floor(uptimeSec % 60);
+        
+        const used = process.memoryUsage().rss / 1024 / 1024;
+        const total = os.totalmem() / 1024 / 1024;
+        
+        const mode = (config.MODE || "public").toUpperCase();
+        const prefix = (config.PREFIX || ".");
 
-      /* ───────────── UPTIME ───────────── */
-      const uptimeSec = process.uptime();
-      const hrs = Math.floor(uptimeSec / 3600);
-      const mins = Math.floor((uptimeSec % 3600) / 60);
-      const secs = Math.floor(uptimeSec % 60);
-      const uptime = `${hrs}h ${mins}m ${secs}s`;
+        // 3. HARDCODED ALIVE MESSAGE (Using Double Quotes for Copy-Paste Safety)
+        const aliveText = 
+        "\n╭─⬣「 𝗞𝗜𝗡𝗚 𝗥𝗔𝗡𝗨𝗫 𝗣𝗥𝗢 」⬣─╮\n" +
+        "│\n" +
+        "│  🟢 Status  : Online & Active ✨\n" +
+        "│  ⚙️ Mode    : " + mode + "\n" +
+        "│  🔧 Prefix  : " + prefix + "\n" +
+        "│\n" +
+        "├─⬣「 𝗦𝗬𝗦𝗧𝗘𝗠 𝗦𝗧𝗔𝗧𝗦 」\n" +
+        "│\n" +
+        "│  🕒 Uptime  : " + hrs + "h " + mins + "m " + secs + "s\n" +
+        "│  💾 RAM     : " + used.toFixed(2) + "MB / " + total.toFixed(0) + "MB\n" +
+        "│  💻 Platform: " + os.platform() + "\n" +
+        "│\n" +
+        "╰─⬣「 ᴹᵃᵈᵉ ᵇʸ ᴹᴿ. ᴿᵃⁿˢᵃʳᵃ ᴰᵉᵛⁿᵃᵗʰ 」⬣─╯\n";
 
-      /* ───────────── RAM ───────────── */
-      const used = process.memoryUsage().rss / 1024 / 1024;
-      const total = os.totalmem() / 1024 / 1024;
-      const ram = `${used.toFixed(1)}MB / ${total.toFixed(0)}MB`;
+        // 4. Send Message
+        await ranuxPro.sendMessage(from, { 
+            image: { url: LOGO_URL },
+            caption: aliveText 
+        }, { quoted: mek });
 
-      /* ───────────── BOT DETAILS ───────────── */
-      const botNumber = ranuxPro.user.id.split(":")[0];
-      const platform = os.platform();
-      const mode = (config.MODE || "public").toUpperCase();
-
-      /* ───────────── MESSAGE BUILD ───────────── */
-      let aliveText = ALIVE_MSG
-        .replace("{TIME}", time)
-        .replace("{UPTIME}", uptime)
-        .replace("{RAM}", ram)
-        .replace("{MODE}", mode);
-
-      // Extra dynamic panel
-      aliveText += `
-
-━━━━━━━━━━━━━━━━━━━━━━
-🤖 BOT DETAILS
-
-📞 Number   : ${botNumber}
-🖥️ Platform : ${platform}
-⚙️ Mode     : ${mode}
-🔧 Prefix   : ${config.PREFIX}
-━━━━━━━━━━━━━━━━━━━━━━
-`;
-
-      /* ───────────── SEND ───────────── */
-      if (ALIVE_IMG) {
-        await ranuxPro.sendMessage(
-          from,
-          {
-            image: { url: ALIVE_IMG },
-            caption: aliveText,
-          },
-          { quoted: mek }
-        );
-      } else {
-        await reply(aliveText);
-      }
     } catch (e) {
-      console.error("Alive Error:", e);
-      reply("❌ Alive status unavailable right now.");
+        console.error("Alive Error:", e);
+        reply("❌ Alive status unavailable.");
     }
-  }
-);
+});
