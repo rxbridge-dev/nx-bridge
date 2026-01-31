@@ -47,31 +47,35 @@ cmd({
     await reply(msg);
 });
 
-// 🔥 HANDLE NUMBER REPLIES (Conflict Free Logic)
+// 🔥 HANDLER FIXED (With Filter Logic)
 cmd({
-    on: "body"
+    on: "body",
+    // 🛠️ THIS FILTER IS IMPORTANT (Tells the bot when to run this code)
+    filter: (body, { message }) => {
+        const quoted = message.quoted || {};
+        const quotedMsg = quoted.msg || {};
+        const text = quotedMsg.caption || quotedMsg.text || quotedMsg.conversation || "";
+        // Only run if the user is replying to Our Settings Menu
+        return text.includes("KING RANUX PRO SETTINGS");
+    }
 }, async (bot, mek, m, { from, body, isOwner, reply }) => {
-    if (!isOwner || !m.quoted) return; 
-
-    // Extract the quoted text accurately to prevent crashing other plugins
-    const quotedMsg = m.quoted.msg || {};
-    const quotedText = quotedMsg.conversation || quotedMsg.text || quotedMsg.caption || "";
-
-    // ✅ STRICT CHECK: Only work if quoting the Settings Menu
-    // This allows Movie/Download plugins to use number replies freely
-    if (!quotedText.includes("KING RANUX PRO SETTINGS")) return;
+    
+    // Safety check again inside (Double security)
+    if (!isOwner || !m.quoted) return;
 
     const input = body.trim();
     const number = parseInt(input.split(" ")[0]); 
     if (isNaN(number)) return;
 
+    // Handle Reset
     if (number === 0) {
         await resetSettings(bot);
         return reply("✅ *Database Reset Successfully!* \nRestarting bot to apply defaults...");
     }
 
+    // Handle Setting Update
     const setting = settingsList.find(s => s.id === number);
-    if (!setting) return reply("❌ Invalid number!");
+    if (!setting) return reply("❌ Invalid number! Check the list again.");
 
     let newValue;
     
@@ -94,7 +98,6 @@ cmd({
     const success = await updateSetting(bot, setting.key, newValue);
 
     if (success) {
-        // Just send a reply confirmation to avoid edit conflicts
         await reply("✅ *Updated Successfully!*\n\n🔧 " + setting.label + " ➔ " + newValue);
     } else {
         reply("❌ Failed to update database.");
