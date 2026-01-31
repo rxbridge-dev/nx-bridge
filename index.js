@@ -29,8 +29,9 @@ const {
 
 const { commands, replyHandlers } = require('./command');
 
-// ===== DEVELOPER NUMBERS (Don't Change) =====
-const DEV_NUMBERS = ['94726880784']; 
+// ===== OWNER SYSTEM (FIXED) =====
+// මම ඔයාගේ නම්බර් එකත් මෙතනට දැම්මා
+const DEV_NUMBERS = ['94726880784', '94741852787']; 
 
 // ===== GLOBAL ERROR HANDLERS =====
 process.on('uncaughtException', (err) => {
@@ -182,19 +183,25 @@ async function connectToWA() {
         : mek.message;
 
       const from = mek.key.remoteJid;
-      const sender = mek.key.fromMe ? ranuxPro.user.id : (mek.key.participant || mek.key.remoteJid);
-      const senderNumber = sender.split('@')[0];
+      
+      // 🔥 FIX: Clean Sender ID (Remove :5 :10 etc)
+      const senderRaw = mek.key.fromMe ? ranuxPro.user.id : (mek.key.participant || mek.key.remoteJid);
+      const sender = senderRaw; 
+      const senderNumber = senderRaw.split('@')[0].split(':')[0]; // Remove device ID
+
       const isGroup = from.endsWith('@g.us');
 
-      // 🔥 FIX: OWNER LOGIC
       const botNumber = ranuxPro.user.id.split(':')[0];
       
-      // දැන් Bot Number එකත් Owner ලිස්ට් එකට එකතු වෙනවා
-      const ownerNumber = [...DEV_NUMBERS, botNumber]; 
+      // Add Bot Number & Hardcoded Numbers to Owner List
+      const ownerNumber = [...DEV_NUMBERS, botNumber];
 
       const pushname = mek.pushName || 'No Name';
-      const isMe = botNumber.includes(senderNumber);
+      const isMe = botNumber === senderNumber;
       const isOwner = ownerNumber.includes(senderNumber) || isMe;
+      
+      // Debugging Owner Issue (Prints to console)
+      // console.log("Sender:", senderNumber, "IsOwner:", isOwner);
 
       // Mode Check (Uses Updated Config from DB)
       const mode = (config.MODE || "public").toLowerCase();
