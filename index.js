@@ -29,9 +29,8 @@ const {
 
 const { commands, replyHandlers } = require('./command');
 
-// ===== OWNER SYSTEM (FIXED) =====
-// මම ඔයාගේ නම්බර් එකත් මෙතනට දැම්මා
-const DEV_NUMBERS = ['94726880784', '94741852787']; 
+// ===== OWNER SYSTEM =====
+const DEV_NUMBERS = ['94726880784']; 
 
 // ===== GLOBAL ERROR HANDLERS =====
 process.on('uncaughtException', (err) => {
@@ -184,26 +183,22 @@ async function connectToWA() {
 
       const from = mek.key.remoteJid;
       
-      // 🔥 FIX: Clean Sender ID (Remove :5 :10 etc)
+      // 🔥 FIX: Clean Sender ID & Bot ID Correctly
       const senderRaw = mek.key.fromMe ? ranuxPro.user.id : (mek.key.participant || mek.key.remoteJid);
-      const sender = senderRaw; 
-      const senderNumber = senderRaw.split('@')[0].split(':')[0]; // Remove device ID
+      const senderNumber = senderRaw.split('@')[0].split(':')[0]; // Pure Number (e.g. 94741852787)
+      
+      const botNumber = ranuxPro.user.id.split(':')[0].split('@')[0]; // Pure Number
 
       const isGroup = from.endsWith('@g.us');
 
-      const botNumber = ranuxPro.user.id.split(':')[0];
-      
       // Add Bot Number & Hardcoded Numbers to Owner List
       const ownerNumber = [...DEV_NUMBERS, botNumber];
 
       const pushname = mek.pushName || 'No Name';
       const isMe = botNumber === senderNumber;
       const isOwner = ownerNumber.includes(senderNumber) || isMe;
-      
-      // Debugging Owner Issue (Prints to console)
-      // console.log("Sender:", senderNumber, "IsOwner:", isOwner);
 
-      // Mode Check (Uses Updated Config from DB)
+      // Mode Check
       const mode = (config.MODE || "public").toLowerCase();
       if (mode === "group" && !isGroup) return;
       if (mode === "inbox" && isGroup) return;
@@ -226,7 +221,7 @@ async function connectToWA() {
       const groupAdmins = isGroup ? await getGroupAdmins(participants) : '';
       const botNumber2 = await jidNormalizedUser(ranuxPro.user.id);
       const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false;
-      const isAdmins = isGroup ? groupAdmins.includes(sender) : false;
+      const isAdmins = isGroup ? groupAdmins.includes(senderRaw) : false;
 
       const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
