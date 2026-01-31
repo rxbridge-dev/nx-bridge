@@ -2,108 +2,97 @@ const { cmd } = require("../command");
 const config = require("../config");
 const { updateSetting, resetSettings } = require("../lib/database");
 
+// Available Settings List for Validation
 const settingsList = [
-    { id: 1, key: "AUTO_STATUS_SEEN", label: "Auto Status Seen", type: "boolean" },
-    { id: 2, key: "AUTO_STATUS_REACT", label: "Auto Status React", type: "boolean" },
-    { id: 3, key: "AUTO_STATUS_FORWARD", label: "Auto Status Forward", type: "boolean" },
-    { id: 4, key: "ANTI_DELETE", label: "Anti Delete System", type: "boolean" },
-    { id: 5, key: "MODE", label: "Bot Mode", type: "select", options: ["public", "private", "group", "inbox"] },
-    { id: 6, key: "MOVIE_FOOTER_TEXT", label: "Movie Footer", type: "text" }
+    { key: "AUTO_STATUS_SEEN", label: "Auto Status Seen" },
+    { key: "AUTO_STATUS_REACT", label: "Auto Status React" },
+    { key: "AUTO_STATUS_FORWARD", label: "Auto Status Forward" },
+    { key: "ANTI_DELETE", label: "Anti Delete System" },
+    { key: "MODE", label: "Bot Mode" },
+    { key: "MOVIE_FOOTER_TEXT", label: "Movie Footer" }
 ];
 
-const MENU_TITLE = "⚙️ *KING RANUX PRO SETTINGS* ⚙️";
-
+// 1️⃣ VIEW SETTINGS (Menu Only)
 cmd({
     pattern: "settings",
     alias: ["setting", "config"],
-    desc: "Manage bot settings via UI",
+    desc: "View bot settings",
     category: "owner",
     react: "⚙️",
     filename: __filename
-}, async (bot, mek, m, { from, isOwner, reply }) => {
+}, async (bot, mek, m, { from, isOwner, reply, prefix }) => {
     if (!isOwner) return reply("❌ You are not the owner!");
 
-    let msg = MENU_TITLE + "\n\n";
-    msg += "👋 _Reply with the number to change setting._\n\n";
+    let msg = "⚙️ *KING RANUX PRO SETTINGS* ⚙️\n\n";
 
-    settingsList.forEach((s) => {
+    settingsList.forEach((s, index) => {
         let currentValue = config[s.key];
-        let status = "";
-
-        if (s.type === "boolean") {
-            status = currentValue ? "✅ [ON]" : "❌ [OFF]";
-        } else if (s.type === "select") {
-            status = "🔄 [" + currentValue.toUpperCase() + "]";
-        } else {
-            status = "📝 [TEXT]";
+        
+        // Format Boolean Values
+        if (typeof currentValue === "boolean") {
+            currentValue = currentValue ? "✅ [ON]" : "❌ [OFF]";
+        } 
+        // Format Others
+        else {
+            currentValue = "[" + String(currentValue).toUpperCase() + "]";
         }
 
-        msg += "*" + s.id + ".* " + s.label + "\n👉 Status: " + status + "\n\n";
+        msg += "*" + (index + 1) + ". " + s.key + "*\n👉 " + currentValue + "\n\n";
     });
 
-    msg += "*0.* 🔄 Reset All Settings\n";
-    msg += "\n━━━━━━━━━━━━━━━━━━━━━━";
+    msg += "━━━━━━━━━━━━━━━━━━━━━━\n";
+    msg += "📝 *HOW TO CHANGE?*\n";
+    msg += "Use " + prefix + "update <KEY> <VALUE>\n\n";
+    msg += "*Examples:*\n";
+    msg += "▶ " + prefix + "update AUTO_STATUS_SEEN on\n";
+    msg += "▶ " + prefix + "update MODE private\n";
+    msg += "▶ " + prefix + "update MOVIE_FOOTER_TEXT My Bot\n";
 
     await reply(msg);
 });
 
-// 🔥 HANDLER FIXED (With Filter Logic)
+// 2️⃣ UPDATE COMMAND (Change Settings)
 cmd({
-    on: "body",
-    // 🛠️ THIS FILTER IS IMPORTANT (Tells the bot when to run this code)
-    filter: (body, { message }) => {
-        const quoted = message.quoted || {};
-        const quotedMsg = quoted.msg || {};
-        const text = quotedMsg.caption || quotedMsg.text || quotedMsg.conversation || "";
-        // Only run if the user is replying to Our Settings Menu
-        return text.includes("KING RANUX PRO SETTINGS");
-    }
-}, async (bot, mek, m, { from, body, isOwner, reply }) => {
-    
-    // Safety check again inside (Double security)
-    if (!isOwner || !m.quoted) return;
+    pattern: "update",
+    alias: ["set"],
+    desc: "Update a setting",
+    category: "owner",
+    filename: __filename
+}, async (bot, mek, m, { from, isOwner, reply, args, q }) => {
+    if (!isOwner) return reply("❌ You are not the owner!");
 
-    const input = body.trim();
-    const number = parseInt(input.split(" ")[0]); 
-    if (isNaN(number)) return;
-
-    // Handle Reset
-    if (number === 0) {
-        await resetSettings(bot);
-        return reply("✅ *Database Reset Successfully!* \nRestarting bot to apply defaults...");
+    if (!q || args.length < 2) {
+        return reply("❌ *Incorrect Format!*\nUse: .update <KEY> <VALUE>\nExample: .update ANTI_DELETE on");
     }
 
-    // Handle Setting Update
-    const setting = settingsList.find(s => s.id === number);
-    if (!setting) return reply("❌ Invalid number! Check the list again.");
+    // 1. Get Key and Value
+    const targetKey = args[0].toUpperCase();
+    let value = q.replace(targetKey, "").trim();
 
-    let newValue;
-    
-    if (setting.type === "boolean") {
-        newValue = !config[setting.key];
-    } 
-    
-    else if (setting.type === "select") {
-        const currentIndex = setting.options.indexOf(config[setting.key]);
-        const nextIndex = (currentIndex + 1) % setting.options.length;
-        newValue = setting.options[nextIndex];
-    } 
-    
-    else if (setting.type === "text") {
-        const textData = body.trim().split(" ").slice(1).join(" ");
-        if (!textData) return reply("✏️ Please type the number and value.\nExample: *" + setting.id + " New Footer Text*");
-        newValue = textData;
+    // 2. Validate Key
+    const validKeys = settingsList.map(s => s.key);
+    if (!validKeys.includes(targetKey)) {
+        return reply("❌ Invalid Setting Key!\nUse .settings to check available keys.");
     }
 
-    const success = await updateSetting(bot, setting.key, newValue);
+    // 3. Format Booleans (on/off/true/false)
+    if (["ON", "TRUE", "ENABLE"].includes(value.toUpperCase())) {
+        value = true;
+    } else if (["OFF", "FALSE", "DISABLE"].includes(value.toUpperCase())) {
+        value = false;
+    }
+
+    // 4. Update Database & RAM
+    const success = await updateSetting(bot, targetKey, value);
 
     if (success) {
-        await reply("✅ *Updated Successfully!*\n\n🔧 " + setting.label + " ➔ " + newValue);
+        return reply("✅ *Settings Updated!*\n\n🔧 " + targetKey + " ➔ " + value);
     } else {
-        reply("❌ Failed to update database.");
+        return reply("❌ Database Error! Failed to update.");
     }
 });
 
+// 3️⃣ RESET DATABASE
 cmd({
     pattern: "resetdb",
     desc: "Reset all settings to default",
@@ -112,5 +101,5 @@ cmd({
 }, async (bot, mek, m, { reply, isOwner }) => {
     if (!isOwner) return;
     await resetSettings(bot);
-    reply("🔄 Database cleared. Please restart bot.");
+    reply("🔄 Database cleared. Restarting bot is recommended.");
 });
