@@ -11,6 +11,8 @@ const settingsList = [
     { id: 6, key: "MOVIE_FOOTER_TEXT", label: "Movie Footer", type: "text" }
 ];
 
+const MENU_TITLE = "⚙️ *KING RANUX PRO SETTINGS* ⚙️";
+
 cmd({
     pattern: "settings",
     alias: ["setting", "config"],
@@ -21,7 +23,7 @@ cmd({
 }, async (bot, mek, m, { from, isOwner, reply }) => {
     if (!isOwner) return reply("❌ You are not the owner!");
 
-    let msg = "⚙️ *KING RANUX PRO SETTINGS* ⚙️\n\n";
+    let msg = MENU_TITLE + "\n\n";
     msg += "👋 _Reply with the number to change setting._\n\n";
 
     settingsList.forEach((s) => {
@@ -45,18 +47,19 @@ cmd({
     await reply(msg);
 });
 
-// 🔥 HANDLE NUMBER REPLIES
+// 🔥 HANDLE NUMBER REPLIES (Conflict Free Logic)
 cmd({
     on: "body"
 }, async (bot, mek, m, { from, body, isOwner, reply }) => {
     if (!isOwner || !m.quoted) return; 
 
-    // 🔥 FIX: Safer way to check quoted message text
-    const quotedText = m.quoted.msg.text || m.quoted.msg.caption || m.quoted.msg || "";
-    
-    // Check if it's our settings menu
-    if (typeof quotedText === "string" && !quotedText.includes("KING RANUX PRO SETTINGS")) return;
-    if (typeof quotedText !== "string") return;
+    // Extract the quoted text accurately to prevent crashing other plugins
+    const quotedMsg = m.quoted.msg || {};
+    const quotedText = quotedMsg.conversation || quotedMsg.text || quotedMsg.caption || "";
+
+    // ✅ STRICT CHECK: Only work if quoting the Settings Menu
+    // This allows Movie/Download plugins to use number replies freely
+    if (!quotedText.includes("KING RANUX PRO SETTINGS")) return;
 
     const input = body.trim();
     const number = parseInt(input.split(" ")[0]); 
@@ -91,10 +94,8 @@ cmd({
     const success = await updateSetting(bot, setting.key, newValue);
 
     if (success) {
-        await bot.sendMessage(from, {
-            text: "✅ *Updated Successfully!* \n\n🔧 Setting: " + setting.label + "\n✨ New Value: " + newValue,
-            edit: m.quoted.key 
-        });
+        // Just send a reply confirmation to avoid edit conflicts
+        await reply("✅ *Updated Successfully!*\n\n🔧 " + setting.label + " ➔ " + newValue);
     } else {
         reply("❌ Failed to update database.");
     }
