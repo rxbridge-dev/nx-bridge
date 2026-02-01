@@ -1,5 +1,3 @@
---- START OF FILE menu.js ---
-
 const { cmd, commands } = require("../command");
 const os = require("os");
 const config = require("../config");
