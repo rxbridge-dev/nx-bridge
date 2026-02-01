@@ -1,29 +1,42 @@
+--- START OF FILE menu.js ---
+
 const { cmd, commands } = require("../command");
+const os = require("os");
+const config = require("../config");
 
+// State management
 const pendingMenu = {};
-const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
 
+// Stylish Number Emojis for Categories
+const numEmojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+
+// Header Image
 const HEADER_IMG = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/king-ranux-pro-main-logo.png";
 
-const FOOTER = `
-━━━━━━━━━━━━━━━━━━━━━━
-👑 King RANUX PRO
-𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱
-━━━━━━━━━━━━━━━━━━━━━━
-`;
+// Design Elements
+const FOOTER = "> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ";
 
 cmd({
   pattern: "menu",
-  react: "✨",
+  alias: ["panel", "list", "commands", "help"],
+  react: "🔮",
   desc: "Show command menu",
   category: "main",
   filename: __filename
-}, async (ranuxPro, mek, m, { from, sender }) => {
+}, async (ranuxPro, mek, m, { from, sender, pushname }) => {
 
-  await ranuxPro.sendMessage(from, { react: { text: "✨", key: mek.key } });
+  // 🛡️ CLASH FIX (IMPORTANT)
+  // Clear all other interactive states to prevent number mix-ups
+  global.pendingSearch = global.pendingSearch || {};
+  global.pendingVideo = global.pendingVideo || {};
+  global.pendingMovie = global.pendingMovie || {};
+  
+  if (global.pendingSearch[sender]) delete global.pendingSearch[sender];
+  if (global.pendingVideo[sender]) delete global.pendingVideo[sender];
+  if (global.pendingMovie[sender]) delete global.pendingMovie[sender];
 
+  // Organize commands
   const commandMap = {};
-
   for (const command of commands) {
     if (command.dontAddCommandList) continue;
     const category = (command.category || "misc").toUpperCase();
@@ -31,105 +44,91 @@ cmd({
     commandMap[category].push(command);
   }
 
-  const categories = Object.keys(commandMap);
+  const categories = Object.keys(commandMap).sort();
+  const date = new Date().toLocaleDateString("en-GB");
+  const time = new Date().toLocaleTimeString("en-GB");
+  const ramUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
 
+  // ✨ ULTRA PREMIUM MENU DESIGN
   let menuText = `
-👑 KING RANUX PRO
-━━━━━━━━━━━━━━━━━━━━━━
-✨ PREMIUM COMMAND MENU
-⚡ Fast • Stable • Powerful
-━━━━━━━━━━━━━━━━━━━━━━
+╔══════════════════════╗
+   🔮 *𝐊𝐈𝐍𝐆 𝐑𝐀𝐍𝐔𝐗 𝐏𝐑𝐎*
+╚══════════════════════╝
 
-📂 CATEGORIES
+👋 *Hi,* ${pushname || 'User'}
+📅 *Date:* ${date}
+⏰ *Time:* ${time}
+💾 *Ram:* ${ramUsage}MB
+🤖 *Prefix:* [ ${config.PREFIX || '.'} ]
+
+👇 *SELECT A CATEGORY*
+━━━━━━━━━━━━━━━━━━━━━━
 `;
 
   categories.forEach((cat, i) => {
-    const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("");
-    menuText += `
-╭──────────────────────╮
-│ ${emojiIndex}  ${cat}
-│ Commands : ${commandMap[cat].length}
-╰──────────────────────╯
-`;
+    // Select Emoji based on index (1-10)
+    const emoji = numEmojis[i + 1] || `${i + 1}️⃣`; 
+    menuText += `${emoji} ➜ ${cat} (${commandMap[cat].length})\n`;
   });
 
-  menuText += `
-━━━━━━━━━━━━━━━━━━━━━━
-📝 HOW TO USE
-Reply with category number
-
-Example:
-1
-2
-3
-
-💡 Tip:
-TOOLS = utility commands
-MEDIA = download commands
-GROUP = group controls
-AI = smart features
-${FOOTER}
-`;
+  menuText += `━━━━━━━━━━━━━━━━━━━━━━
+🔢 *Reply with the number to open!*
+${FOOTER}`;
 
   await ranuxPro.sendMessage(from, {
     image: { url: HEADER_IMG },
     caption: menuText.trim()
   }, { quoted: mek });
 
-  pendingMenu[sender] = { step: "category", commandMap, categories };
+  // Save State (Specific Type to avoid conflict)
+  pendingMenu[sender] = { type: "CATEGORY_SELECT", commandMap, categories };
 });
 
+// 🔄 REPLY HANDLER
 cmd({
   filter: (text, { sender }) =>
     pendingMenu[sender] &&
-    pendingMenu[sender].step === "category" &&
-    /^[1-9][0-9]*$/.test(text.trim())
+    pendingMenu[sender].type === "CATEGORY_SELECT" && // Check context explicitly
+    /^\d+$/.test(text.trim())
 }, async (ranuxPro, mek, m, { from, body, sender }) => {
-
-  await ranuxPro.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
   const { commandMap, categories } = pendingMenu[sender];
   const index = parseInt(body.trim()) - 1;
 
   if (index < 0 || index >= categories.length) {
-    return ranuxPro.sendMessage(from, { text: "❌ Invalid category number!" }, { quoted: mek });
+    return ranuxPro.sendMessage(from, { text: "❌ *Invalid Number! Please check the list.*" }, { quoted: mek });
   }
+
+  await ranuxPro.sendMessage(from, { react: { text: "📂", key: mek.key } });
 
   const selectedCategory = categories[index];
   const cmdsInCategory = commandMap[selectedCategory];
 
+  // ✨ SUB-MENU DESIGN (TREE STYLE)
   let cmdText = `
-📂 ${selectedCategory} COMMANDS
-━━━━━━━━━━━━━━━━━━━━━━
+╭─── 📂 *${selectedCategory}* ───
+│
 `;
 
-  cmdsInCategory.forEach((c, i) => {
-    const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("");
+  cmdsInCategory.forEach((c) => {
     const patterns = [c.pattern, ...(c.alias || [])]
       .filter(Boolean)
       .map(p => `.${p}`)
       .join(", ");
 
-    cmdText += `
-╭──────────────────────╮
-│ ${emojiIndex}  ${patterns}
-│ ${c.desc || "No description"}
-╰──────────────────────╯
-`;
+    cmdText += `│ 🔹 *${patterns}*
+│ ╰─ ${c.desc || "No description"}
+│\n`;
   });
 
-  cmdText += `
-━━━━━━━━━━━━━━━━━━━━━━
-Total Commands : ${cmdsInCategory.length}
-
-Type .menu to go back
-${FOOTER}
-`;
+  cmdText += `╰───────────────────●
+${FOOTER}`;
 
   await ranuxPro.sendMessage(from, {
     image: { url: HEADER_IMG },
     caption: cmdText.trim()
   }, { quoted: mek });
 
+  // Clear state after showing commands
   delete pendingMenu[sender];
 });
