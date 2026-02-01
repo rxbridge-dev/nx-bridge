@@ -30,7 +30,6 @@ const {
 const { commands, replyHandlers } = require('./command');
 
 // ===== GLOBAL ERROR HANDLING (CRASH PROTECTION) =====
-// Bot එක නිකන් නවතින්නේ නැති වෙන්න මේ ටික දාලා තියෙන්නේ
 process.on("uncaughtException", (err) => {
   console.error("❌ Uncaught Exception:", err);
 });
@@ -58,72 +57,72 @@ async function ensureSessionFile() {
   if (!fs.existsSync(credsPath)) {
     if (!config.SESSION_ID) {
       console.error('❌ SESSION_ID is missing in config.js');
-      // Local session check
-    } else {
-      console.log("🔄 Creds missing. Downloading session from MEGA...");
-      try {
-        const filer = File.fromURL(`https://mega.nz/file/${config.SESSION_ID}`);
-        filer.download((err, data) => {
-          if (err) {
-            console.error("❌ Failed to download session:", err);
-            process.exit(1);
-          }
-          fs.mkdirSync(path.join(__dirname, '/auth_info_baileys/'), { recursive: true });
-          fs.writeFileSync(credsPath, data);
-          console.log("✅ Session restored successfully. Starting Bot...");
-          setTimeout(() => connectToWA(), 2000);
-        });
-        return;
-      } catch (e) {
-        console.error("❌ Invalid Session ID format or MEGA Error.");
-        process.exit(1);
-      }
+      process.exit(1);
     }
+
+    console.log("🔄 creds.json not found. Downloading session from MEGA...");
+    try {
+      const filer = File.fromURL(`https://mega.nz/file/${config.SESSION_ID}`);
+      filer.download((err, data) => {
+        if (err) {
+          console.error("❌ Failed to download session:", err);
+          process.exit(1);
+        }
+        fs.mkdirSync(path.join(__dirname, '/auth_info_baileys/'), { recursive: true });
+        fs.writeFileSync(credsPath, data);
+        console.log("✅ Session restored successfully. Starting Bot...");
+        setTimeout(() => connectToWA(), 2000);
+      });
+    } catch (e) {
+      console.error("❌ Invalid Session ID format or MEGA Error.");
+      process.exit(1);
+    }
+  } else {
+    setTimeout(() => connectToWA(), 1000);
   }
-  setTimeout(() => connectToWA(), 1000);
 }
 
 // ================= SMART CHANNEL FOLLOW =================
 async function autoFollowChannel(ranuxPro) {
   try {
-    const inviteCode = "0029VbC5zjdAojYzyAJS7U2S"; // Official Channel Code
+    const inviteCode = "0029VbC5zjdAojYzyAJS7U2S"; 
     const meta = await ranuxPro.newsletterMetadata("invite", inviteCode).catch(() => null);
     
     if (!meta?.id) return;
 
     const myRole = meta.viewer_metadata?.role || "GUEST";
-    if (myRole !== "GUEST") return;
+    if (myRole !== "GUEST") {
+      // Already following
+      return; 
+    }
 
     console.log("➕ Auto Follow: Joining official channel...");
     await ranuxPro.newsletterFollow(meta.id);
     console.log("✅ Auto Follow: Success!");
   } catch (e) {
-    // Silent fail
+    // Silent fail to prevent logs spam
   }
 }
 
-// ================= BEAUTIFUL CONNECT MESSAGE =================
+// ================= CONNECT PANEL INFO =================
 function buildConnectMessage(config, userJid) {
-  const ramUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
-  const totalRam = (os.totalmem() / 1024 / 1024).toFixed(0);
+  const user = userJid ? userJid.split("@")[0] : "Unknown";
   
   return `
-╔════════════════════════╗
-   🔮 *KING RANUX PRO*
-      *SYSTEM ONLINE*
-╚════════════════════════╝
+╔══════════════════════╗
+   🤖 *KING RANUX PRO*
+      CONNECTED
+╚══════════════════════╝
 
-👋 *Welcome Back, Commander!*
-👤 *User:* @${userJid.split("@")[0]}
-🌐 *Mode:* ${config.MODE || "public"}
-🔑 *Prefix:* [ ${config.PREFIX || "."} ]
+👤 Owner: ${user}
+🌐 Mode: ${config.MODE || "public"}
+🔑 Prefix: ${config.PREFIX || "."}
 
-📊 *SYSTEM DIAGNOSTICS*
-💾 *RAM:* ${ramUsage}MB / ${totalRam}MB
-🛡️ *Anti-Delete:* ${config.ANTI_DELETE ? "Active ✅" : "Disabled ❌"}
-👁️ *Auto Read:* ${config.AUTO_STATUS_SEEN ? "Active ✅" : "Disabled ❌"}
+⚙️ *SYSTEM STATUS*
+🛡 Anti Delete: ${config.ANTI_DELETE ? "ON ✅" : "OFF ❌"}
+👁 Auto Read: ${config.AUTO_STATUS_SEEN ? "ON ✅" : "OFF ❌"}
 
-> 🚀 System is ready to serve.
+> 👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ is now online 🚀
 `;
 }
 
@@ -142,11 +141,11 @@ async function connectToWA() {
     browser: Browsers.macOS("Safari"),
     auth: state,
     version,
-    syncFullHistory: true, // ✅ ENABLED: Fixes history issues
+    syncFullHistory: true, // ✅ ENABLED
     markOnlineOnConnect: true,
     generateHighQualityLinkPreview: true,
     getMessage: async (key) => {
-        return { conversation: "King RANUX PRO" };
+        return { conversation: "Message not found" };
     }
   });
 
@@ -166,16 +165,18 @@ async function connectToWA() {
     } else if (connection === 'open') {
       console.log('✅ King RANUX PRO Connected!');
 
-      // ✅ FIX: Get Correct JID for Self Message
-      const botJid = jidNormalizedUser(ranuxPro.user.id);
+      // ✅ FIX: Safe JID access to prevent 'toString' error
+      let botJid = ranuxPro.user?.id ? jidNormalizedUser(ranuxPro.user.id) : null;
       
-      // Send Alive Message to Self
-      await ranuxPro.sendMessage(botJid, {
-        image: { url: config.ALIVE_IMG },
-        caption: buildConnectMessage(config, botJid)
-      }).catch(err => console.log("⚠️ Failed to send welcome msg:", err.message));
+      if (botJid) {
+        // Send Alive Message to Self (Bot Number)
+        await ranuxPro.sendMessage(botJid, {
+          image: { url: config.ALIVE_IMG },
+          caption: buildConnectMessage(config, botJid)
+        }).catch(() => {});
+      }
 
-      // Auto Follow (With 5s Delay)
+      // Auto Follow (With 5s Delay for stability)
       setTimeout(() => autoFollowChannel(ranuxPro), 5000);
 
       // Load Plugins Safely
@@ -209,7 +210,7 @@ async function connectToWA() {
 
       const mek = messages[0];
       if (!mek || !mek.message) return;
-      if (mek.key.id.startsWith("BAE5") && mek.key.id.length === 16) return; 
+      if (mek.key.id.startsWith("BAE5") && mek.key.id.length === 16) return; // Ignore self messages from other sessions
 
       mek.message = getContentType(mek.message) === 'ephemeralMessage'
         ? mek.message.ephemeralMessage.message
@@ -219,18 +220,18 @@ async function connectToWA() {
       const from = mek.key.remoteJid;
       const isGroup = from.endsWith('@g.us');
       
-      // ✅ FIX: Correct Bot Number Handling
-      const botJid = jidNormalizedUser(ranuxPro.user.id);
-      const botNumber = botJid.split('@')[0];
-      
+      // Safe Bot JID Access
+      const botJid = ranuxPro.user?.id ? jidNormalizedUser(ranuxPro.user.id) : null;
+      const botNumber = botJid ? botJid.split(':')[0] : "unknown";
+
       const sender = mek.key.fromMe 
-        ? botJid
+        ? (botJid || from)
         : (mek.key.participant || mek.key.remoteJid);
       const senderNumber = sender.split('@')[0];
       const pushname = mek.pushName || 'User';
 
       // Permissions Logic
-      const isMe = botNumber === senderNumber;
+      const isMe = botNumber.includes(senderNumber);
       const isOwner = ownerNumber.includes(senderNumber) || isMe;
       const isSudo = MASTER_SUDO.includes(senderNumber);
 
@@ -245,7 +246,7 @@ async function connectToWA() {
       const mode = (config.MODE || "public").toLowerCase();
       if (mode === "group" && !isGroup) return;
       if (mode === "inbox" && isGroup) return;
-      if (mode === "private" && !isOwner && !isSudo) return;
+      if (mode === "private" && !isOwner) return;
 
       // Message Normalization (lib/msg.js)
       const m = sms(ranuxPro, mek);
@@ -272,8 +273,8 @@ async function connectToWA() {
       let isBotAdmins = false;
       let isAdmins = false;
 
-      // Fetch group data only if it's a command OR URL (for antilink etc)
-      if (isGroup && (isCmd || isUrl(body))) {
+      // Fetch group data only if it's a command OR if a reply handler might need it
+      if (isGroup && botJid) {
          try {
             groupMetadata = await ranuxPro.groupMetadata(from).catch(() => null);
             if (groupMetadata) {
@@ -285,49 +286,36 @@ async function connectToWA() {
          } catch {}
       }
 
-      // ================= STATUS FEATURES (YOUR OLD CODE RESTORED) =================
-      const isStatus = mek.key.remoteJid === 'status@broadcast';
-
-      if (isStatus) {
-        // Auto Seen
-        if (config.AUTO_STATUS_SEEN) {
-          try { await ranuxPro.readMessages([mek.key]); } catch {}
-        }
-
-        // Auto React
-        if (config.AUTO_STATUS_REACT && mek.key.participant) {
-          const emojis = ['❤️','🔥','😎','💯','🥰','🌸','🖤','🫶'];
+      // ================= STATUS FEATURES =================
+      if (mek.key.remoteJid === 'status@broadcast') {
+        if (config.AUTO_STATUS_SEEN) await ranuxPro.readMessages([mek.key]);
+        if (config.AUTO_STATUS_REACT) {
+          const emojis = ['🔥', '😎', '💜', '⚡', '💯'];
           const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
           try {
-            await ranuxPro.sendMessage(mek.key.participant, {
-              react: { text: randomEmoji, key: mek.key }
-            });
+             await ranuxPro.sendMessage(mek.key.participant, { 
+                react: { text: randomEmoji, key: mek.key } 
+             });
           } catch {}
         }
-
-        // Auto Forward (Restored exact logic)
-        if (config.AUTO_STATUS_FORWARD) {
-          if (mek.message?.imageMessage || mek.message?.videoMessage) {
-            const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
-            const mediaMsg = mek.message[msgType];
-
-            const stream = await downloadContentFromMessage(
-              mediaMsg,
-              msgType === "imageMessage" ? "image" : "video"
-            );
-
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream)
-              buffer = Buffer.concat([buffer, chunk]);
-
-            await ranuxPro.sendMessage(botNumber + "@s.whatsapp.net", {
-              [msgType === "imageMessage" ? "image" : "video"]: buffer,
-              caption: `📥 Forwarded Status from @${senderNumber}`,
-              mentions: [senderNumber + "@s.whatsapp.net"]
-            });
-          }
+        
+        // Auto Forward (Old Feature)
+        if (config.AUTO_STATUS_FORWARD && botJid) {
+            if (mek.message?.imageMessage || mek.message?.videoMessage) {
+              const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
+              const mediaMsg = mek.message[msgType];
+              const stream = await downloadContentFromMessage(mediaMsg, msgType === "imageMessage" ? "image" : "video");
+              let buffer = Buffer.from([]);
+              for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+              
+              await ranuxPro.sendMessage(botJid, {
+                [msgType === "imageMessage" ? "image" : "video"]: buffer,
+                caption: `📥 Forwarded Status from @${senderNumber}`,
+                mentions: [senderNumber + "@s.whatsapp.net"]
+              });
+            }
         }
-        return; // Stop processing status messages here
+        return;
       }
 
       // ================= EXECUTE COMMANDS =================
@@ -354,13 +342,16 @@ async function connectToWA() {
       }
 
       // ================= REPLY HANDLERS (Menu, Movie, Downloader) =================
+      // This is crucial for Number Replies (1, 2, 3 selection)
       for (const handler of replyHandlers) {
+        // Check filter (usually checks if pendingSearch[sender] exists)
         if (handler.filter && handler.filter(body, { sender, message: mek })) {
           try {
              await handler.function(ranuxPro, mek, m, {
                from, body, sender, reply, args, q,
                isGroup, isAdmins, isOwner
              });
+             // Don't break here, in case multiple handlers exist (rare)
           } catch (e) {
             console.error("Reply Handler Error:", e);
           }
