@@ -2,12 +2,11 @@ const { cmd } = require("../command");
 const puppeteer = require("puppeteer");
 const config = require("../config");
 
-// State Management for Interactive Replies
-const pendingSearch = {};
-const pendingQuality = {};
+// Global State
+global.pendingMovie = global.pendingMovie || {};
 
 // ===============================================================
-// CORE SCRAPING LOGIC (UNCHANGED AS REQUESTED)
+// CORE SCRAPING LOGIC (UNCHANGED)
 // ===============================================================
 
 function normalizeQuality(text) {
@@ -106,10 +105,10 @@ async function getPixeldrainLinks(movieUrl) {
 }
 
 // ===============================================================
-// COMMANDS WITH ULTRA PREMIUM UI
+// COMMANDS
 // ===============================================================
 
-// 1. Initial Search Command
+// Step 1: Initial Search
 cmd({
   pattern: "movie",
   alias: ["sinhalasub", "films", "mv"],
@@ -120,8 +119,9 @@ cmd({
 }, async (ranuxPro, mek, m, { from, q, sender, reply }) => {
   if (!q) return reply(`*ℹ️ Please provide a movie name to search.*\n\n*Example:* \`.movie avatar\``);
   
-  // 🛡️ CLASH FIX: Clear other interactive states
-  if (global.pendingMenu) delete global.pendingMenu[sender];
+  // 🛡️ CLASH FIX: Ensure we clear the Global Menu State
+  if (global.pendingMenu) delete global.pendingMenu[sender]; // Clears Menu
+  if (global.pendingVideo) delete global.pendingVideo[sender]; // Clears Video
 
   await reply(`*⏳ Searching for "${q}"... Please wait.*`);
   
@@ -129,20 +129,19 @@ cmd({
     const searchResults = await searchMovies(q);
     if (!searchResults.length) return reply("*❌ No movies found matching your query!*");
     
-    // Store state for this user
-    pendingSearch[sender] = { type: "MOVIE_SELECT", results: searchResults };
+    global.pendingMovie[sender] = { step: 1, results: searchResults };
 
-    let text = `
-╭─「 🎬 *MOVIE SEARCH RESULTS* 」
-│
-│ 💬 *Query:* "${q}"
-├─
-`;
+    let text = `*❖═════╝ 🎬 ╚═════❖*
+   *MOVIE SEARCH RESULTS*
+*❖═════╗ 🎬 ╔═════❖*
+
+*Found ${searchResults.length} results for "${q}"*\n\n`;
+
     searchResults.forEach((movie, i) => {
-        text += `│ *${i + 1}*. ${movie.title}\n`;
+        text += `╭─❏ *${i + 1}.* ${movie.title}
+╰- - - - - - - - - - - - - - - - - - - - - \n\n`;
     });
-    text += `│
-╰─「 *Reply with a number to proceed* 」`;
+    text += `*Reply with the corresponding number to see details.*`;
 
     await ranuxPro.sendMessage(from, { text: text.trim() }, { quoted: mek });
   } catch (e) {
@@ -151,24 +150,23 @@ cmd({
   }
 });
 
-// 2. Reply Handler for Movie Selection
+// Step 2: Movie Details
 cmd({
   filter: (text, { sender }) => 
-    pendingSearch[sender] &&
-    pendingSearch[sender].type === "MOVIE_SELECT" &&
+    global.pendingMovie[sender] &&
+    global.pendingMovie[sender].step === 1 && 
     /^\d+$/.test(text.trim())
 }, async (ranuxPro, mek, m, { body, sender, reply, from }) => {
   await ranuxPro.sendMessage(from, { react: { text: "⏳", key: mek.key } });
 
   const index = parseInt(body.trim()) - 1;
-  const { results } = pendingSearch[sender];
+  const { results } = global.pendingMovie[sender];
 
   if (index < 0 || index >= results.length) {
     return reply("❌ *Invalid number. Please select from the list.*");
   }
   
   const selected = results[index];
-  delete pendingSearch[sender]; // Clear old state
 
   try {
     await reply(`*⏳ Fetching details for "${selected.title}"...*`);
@@ -186,7 +184,6 @@ cmd({
 │
 ╰─「 *Please wait a moment* 」`;
     
-    // Send with thumbnail if available
     if (metadata.thumbnail) {
       await ranuxPro.sendMessage(from, { image: { url: metadata.thumbnail }, caption: metaMsg.trim() }, { quoted: mek });
     } else {
@@ -194,10 +191,15 @@ cmd({
     }
 
     const downloadLinks = await getPixeldrainLinks(selected.movieUrl);
-    if (!downloadLinks.length) return reply(`*❌ No direct download links found under 2GB!*`);
+    if (!downloadLinks.length) {
+        delete global.pendingMovie[sender]; 
+        return reply(`*❌ No direct download links found under 2GB!*`);
+    }
 
-    // Store new state for quality selection
-    pendingQuality[sender] = { type: "QUALITY_SELECT", movie: { metadata, downloadLinks } };
+    global.pendingMovie[sender] = { 
+        step: 2, 
+        movie: { metadata, downloadLinks } 
+    };
 
     let qualityMsg = `
 ╭─「 📥 *AVAILABLE QUALITIES* 」
@@ -211,27 +213,28 @@ cmd({
 
     await ranuxPro.sendMessage(from, { text: qualityMsg.trim() }, { quoted: mek });
   } catch (e) {
+    delete global.pendingMovie[sender]; 
     console.error("Movie Detail Fetch Error:", e);
     reply("❌ *Failed to fetch movie details. The website might be down.*");
   }
 });
 
-// 3. Reply Handler for Quality Selection
+// Step 3: Download
 cmd({
   filter: (text, { sender }) => 
-    pendingQuality[sender] &&
-    pendingQuality[sender].type === "QUALITY_SELECT" &&
+    global.pendingMovie[sender] &&
+    global.pendingMovie[sender].step === 2 && 
     /^\d+$/.test(text.trim())
 }, async (ranuxPro, mek, m, { body, sender, reply, from }) => {
   const index = parseInt(body.trim()) - 1;
-  const { movie } = pendingQuality[sender];
+  const { movie } = global.pendingMovie[sender];
 
   if (index < 0 || index >= movie.downloadLinks.length) {
     return reply("❌ *Invalid quality selection.*");
   }
 
-  delete pendingQuality[sender]; // Clear state
   const selectedLink = movie.downloadLinks[index];
+  delete global.pendingMovie[sender]; // Clear state
   
   await reply(`*🚀 Download initiated for "${movie.metadata.title}" (${selectedLink.quality}). Please wait...*`);
   
@@ -263,10 +266,13 @@ cmd({
   }
 });
 
-// Auto-cleanup for abandoned sessions
+// Auto-cleanup
 setInterval(() => {
   const now = Date.now();
-  const timeout = 10 * 60 * 1000; // 10 minutes
-  for (const s in pendingSearch) if (now - pendingSearch[s].timestamp > timeout) delete pendingSearch[s];
-  for (const s in pendingQuality) if (now - pendingQuality[s].timestamp > timeout) delete pendingQuality[s];
+  const timeout = 10 * 60 * 1000; 
+  for (const sender in global.pendingMovie) {
+    if (now - (global.pendingMovie[sender].timestamp || 0) > timeout) {
+      delete global.pendingMovie[sender];
+    }
+  }
 }, 5 * 60 * 1000);

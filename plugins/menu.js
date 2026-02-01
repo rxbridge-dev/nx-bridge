@@ -2,8 +2,8 @@ const { cmd, commands } = require("../command");
 const os = require("os");
 const config = require("../config");
 
-// State management
-const pendingMenu = {};
+// ✅ GLOBAL STATE (To allow other plugins to clear it)
+global.pendingMenu = global.pendingMenu || {};
 
 // Stylish Number Emojis for Categories
 const numEmojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
@@ -23,15 +23,11 @@ cmd({
   filename: __filename
 }, async (ranuxPro, mek, m, { from, sender, pushname }) => {
 
-  // 🛡️ CLASH FIX (IMPORTANT)
-  // Clear all other interactive states to prevent number mix-ups
-  global.pendingSearch = global.pendingSearch || {};
-  global.pendingVideo = global.pendingVideo || {};
-  global.pendingMovie = global.pendingMovie || {};
-  
-  if (global.pendingSearch[sender]) delete global.pendingSearch[sender];
-  if (global.pendingVideo[sender]) delete global.pendingVideo[sender];
-  if (global.pendingMovie[sender]) delete global.pendingMovie[sender];
+  // 🛡️ CLASH FIX: Aggressively clear ALL other interactive states
+  if (global.pendingSearch) delete global.pendingSearch[sender];
+  if (global.pendingVideo) delete global.pendingVideo[sender];
+  if (global.pendingMovie) delete global.pendingMovie[sender];
+  if (global.pendingQuality) delete global.pendingQuality[sender];
 
   // Organize commands
   const commandMap = {};
@@ -43,8 +39,12 @@ cmd({
   }
 
   const categories = Object.keys(commandMap).sort();
-  const date = new Date().toLocaleDateString("en-GB");
-  const time = new Date().toLocaleTimeString("en-GB");
+
+  // 🕒 TIME FIX: Force Asia/Colombo Timezone
+  const now = new Date();
+  const date = now.toLocaleDateString("en-US", { timeZone: "Asia/Colombo" });
+  const time = now.toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: '2-digit', minute: '2-digit', hour12: true });
+  
   const ramUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
 
   // ✨ ULTRA PREMIUM MENU DESIGN
@@ -64,7 +64,6 @@ cmd({
 `;
 
   categories.forEach((cat, i) => {
-    // Select Emoji based on index (1-10)
     const emoji = numEmojis[i + 1] || `${i + 1}️⃣`; 
     menuText += `${emoji} ➜ ${cat} (${commandMap[cat].length})\n`;
   });
@@ -78,19 +77,19 @@ ${FOOTER}`;
     caption: menuText.trim()
   }, { quoted: mek });
 
-  // Save State (Specific Type to avoid conflict)
-  pendingMenu[sender] = { type: "CATEGORY_SELECT", commandMap, categories };
+  // Save State
+  global.pendingMenu[sender] = { type: "CATEGORY_SELECT", commandMap, categories };
 });
 
 // 🔄 REPLY HANDLER
 cmd({
   filter: (text, { sender }) =>
-    pendingMenu[sender] &&
-    pendingMenu[sender].type === "CATEGORY_SELECT" && // Check context explicitly
+    global.pendingMenu[sender] &&
+    global.pendingMenu[sender].type === "CATEGORY_SELECT" &&
     /^\d+$/.test(text.trim())
 }, async (ranuxPro, mek, m, { from, body, sender }) => {
 
-  const { commandMap, categories } = pendingMenu[sender];
+  const { commandMap, categories } = global.pendingMenu[sender];
   const index = parseInt(body.trim()) - 1;
 
   if (index < 0 || index >= categories.length) {
@@ -102,7 +101,7 @@ cmd({
   const selectedCategory = categories[index];
   const cmdsInCategory = commandMap[selectedCategory];
 
-  // ✨ SUB-MENU DESIGN (TREE STYLE)
+  // ✨ SUB-MENU DESIGN
   let cmdText = `
 ╭─── 📂 *${selectedCategory}* ───
 │
@@ -128,5 +127,5 @@ ${FOOTER}`;
   }, { quoted: mek });
 
   // Clear state after showing commands
-  delete pendingMenu[sender];
+  delete global.pendingMenu[sender];
 });
