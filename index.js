@@ -42,7 +42,7 @@ const app = express();
 const port = process.env.PORT || 8000;
 const credsPath = path.join(__dirname, '/auth_info_baileys/creds.json');
 
-// Dynamic Owner Setup (From Config)
+// Dynamic Owner Setup
 let ownerConfig = config.OWNER_NUMBER || '94726880784';
 const ownerNumber = Array.isArray(ownerConfig) ? ownerConfig : [ownerConfig];
 const MASTER_SUDO = ownerNumber; 
@@ -60,7 +60,6 @@ async function ensureSessionFile() {
       process.exit(1);
     }
 
-    // 1. Try Base64 Decoding First
     try {
         let sessionData = config.SESSION_ID;
         const prefixes = ["King RANUX PRO ~", "𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ ~"];
@@ -84,7 +83,6 @@ async function ensureSessionFile() {
         console.log("⚠️ Base64 restore failed, trying MEGA...");
     }
 
-    // 2. Fallback to MEGA
     console.log("🔄 Downloading session from MEGA...");
     try {
       const filer = File.fromURL(`https://mega.nz/file/${config.SESSION_ID}`);
@@ -170,6 +168,30 @@ async function connectToWA() {
     }
   });
 
+  // 🔥 CORE OVERRIDE: FORCE CHANNEL FORWARD ON ALL MESSAGES 🔥
+  // This ensures EVERY message (Image/Text/Video) sent by the bot gets the channel context
+  const originalSendMessage = ranuxPro.sendMessage;
+  ranuxPro.sendMessage = async (jid, content, options = {}) => {
+      // Define Channel Context
+      const newsletterContext = {
+          newsletterJid: "120363405950699484@newsletter",
+          newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
+          serverMessageId: 143 // Mock ID
+      };
+
+      // Ensure content is an object and inject context
+      if (typeof content === 'object' && content !== null) {
+          if (!content.contextInfo) content.contextInfo = {};
+          
+          content.contextInfo.forwardingScore = 999;
+          content.contextInfo.isForwarded = true;
+          content.contextInfo.forwardedNewsletterMessageInfo = newsletterContext;
+      }
+
+      // Call Original Function with modified content
+      return await originalSendMessage.call(ranuxPro, jid, content, options);
+  };
+
   // ===== CONNECTION EVENTS =====
   ranuxPro.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
@@ -189,19 +211,9 @@ async function connectToWA() {
       let botJid = ranuxPro.user?.id ? jidNormalizedUser(ranuxPro.user.id) : null;
       
       if (botJid) {
-        // Send Alive Message to Self with Channel Context
         await ranuxPro.sendMessage(botJid, {
           image: { url: config.ALIVE_IMG },
-          caption: buildConnectMessage(config, botJid),
-          contextInfo: {
-            forwardingScore: 999,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: "120363405950699484@newsletter",
-                newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
-                serverMessageId: 143
-            }
-          }
+          caption: buildConnectMessage(config, botJid)
         }).catch(() => {});
       }
 
@@ -286,21 +298,8 @@ async function connectToWA() {
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(' ');
 
-      // ✅ CUSTOM REPLY FUNCTION WITH CHANNEL CONTEXT
-      const reply = async (text) => {
-        return await ranuxPro.sendMessage(from, { 
-            text: text,
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: "120363405950699484@newsletter",
-                    newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
-                    serverMessageId: 143
-                }
-            }
-        }, { quoted: mek });
-      };
+      // Default reply (Now automatically enhanced by override)
+      const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
       // Group Metadata
       let groupMetadata = null;
@@ -328,7 +327,8 @@ async function connectToWA() {
           const emojis = ['🔥', '😎', '💜', '⚡', '💯'];
           const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
           try {
-             await ranuxPro.sendMessage(mek.key.participant, { 
+             // Bypass override for status react to avoid errors
+             await originalSendMessage.call(ranuxPro, mek.key.participant, { 
                 react: { text: randomEmoji, key: mek.key } 
              });
           } catch {}
@@ -345,17 +345,7 @@ async function connectToWA() {
               await ranuxPro.sendMessage(botJid, {
                 [msgType === "imageMessage" ? "image" : "video"]: buffer,
                 caption: `📥 Forwarded Status from @${senderNumber}`,
-                mentions: [senderNumber + "@s.whatsapp.net"],
-                // Also forward status with channel context
-                contextInfo: {
-                    forwardingScore: 999,
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: "120363405950699484@newsletter",
-                        newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
-                        serverMessageId: 143
-                    }
-                }
+                mentions: [senderNumber + "@s.whatsapp.net"]
               });
             }
         }
@@ -367,7 +357,7 @@ async function connectToWA() {
         const cmd = commands.find((c) => c.pattern === commandName || (c.alias && c.alias.includes(commandName)));
         
         if (cmd) {
-          if (cmd.react) await ranuxPro.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+          if (cmd.react) await originalSendMessage.call(ranuxPro, from, { react: { text: cmd.react, key: mek.key } });
 
           try {
             await cmd.function(ranuxPro, mek, m, {
