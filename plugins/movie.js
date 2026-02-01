@@ -105,7 +105,7 @@ async function getPixeldrainLinks(movieUrl) {
 }
 
 // ===============================================================
-// COMMANDS
+// COMMANDS (FIXED LOGIC)
 // ===============================================================
 
 // Step 1: Initial Search
@@ -119,9 +119,9 @@ cmd({
 }, async (ranuxPro, mek, m, { from, q, sender, reply }) => {
   if (!q) return reply(`*ℹ️ Please provide a movie name to search.*\n\n*Example:* \`.movie avatar\``);
   
-  // 🛡️ CLASH FIX: Ensure we clear the Global Menu State
-  if (global.pendingMenu) delete global.pendingMenu[sender]; // Clears Menu
-  if (global.pendingVideo) delete global.pendingVideo[sender]; // Clears Video
+  // Clear other states
+  if (global.pendingMenu) delete global.pendingMenu[sender];
+  if (global.pendingVideo) delete global.pendingVideo[sender];
 
   await reply(`*⏳ Searching for "${q}"... Please wait.*`);
   
@@ -150,13 +150,14 @@ cmd({
   }
 });
 
-// Step 2: Movie Details
+// Step 2: Movie Details (Logic Fixed)
 cmd({
   filter: (text, { sender }) => 
     global.pendingMovie[sender] &&
     global.pendingMovie[sender].step === 1 && 
     /^\d+$/.test(text.trim())
 }, async (ranuxPro, mek, m, { body, sender, reply, from }) => {
+  
   await ranuxPro.sendMessage(from, { react: { text: "⏳", key: mek.key } });
 
   const index = parseInt(body.trim()) - 1;
@@ -196,9 +197,12 @@ cmd({
         return reply(`*❌ No direct download links found under 2GB!*`);
     }
 
+    // ✅ STRONG LOGIC FIX:
+    // Store 'lastMsgId' (the ID of the message "1") to prevent double triggering
     global.pendingMovie[sender] = { 
         step: 2, 
-        movie: { metadata, downloadLinks } 
+        movie: { metadata, downloadLinks },
+        lastMsgId: mek.key.id 
     };
 
     let qualityMsg = `
@@ -219,13 +223,16 @@ cmd({
   }
 });
 
-// Step 3: Download
+// Step 3: Download (Logic Fixed)
 cmd({
-  filter: (text, { sender }) => 
+  filter: (text, { sender, message }) => 
     global.pendingMovie[sender] &&
     global.pendingMovie[sender].step === 2 && 
+    // ✅ CHECK: Ensure we are replying to a NEW message, not the one used in Step 2
+    message.key.id !== global.pendingMovie[sender].lastMsgId &&
     /^\d+$/.test(text.trim())
 }, async (ranuxPro, mek, m, { body, sender, reply, from }) => {
+  
   const index = parseInt(body.trim()) - 1;
   const { movie } = global.pendingMovie[sender];
 
@@ -234,7 +241,7 @@ cmd({
   }
 
   const selectedLink = movie.downloadLinks[index];
-  delete global.pendingMovie[sender]; // Clear state
+  delete global.pendingMovie[sender]; // Clear state immediately
   
   await reply(`*🚀 Download initiated for "${movie.metadata.title}" (${selectedLink.quality}). Please wait...*`);
   
