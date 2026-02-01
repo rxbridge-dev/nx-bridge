@@ -29,12 +29,30 @@ const {
 // Import Command System
 const { commands, replyHandlers } = require('./command');
 
-// ===== GLOBAL ERROR HANDLING (CRASH PROTECTION) =====
+// ===== ADVANCED LOG FILTERING (CLEAN CONSOLE) =====
+// This hides unnecessary Baileys "pending key" logs and conflicts
+const logFilter = (err) => {
+    const msg = String(err);
+    if (msg.includes("pending-key") || 
+        msg.includes("rate-overlimit") || 
+        msg.includes("Conflict") ||
+        msg.includes("not-authorized") ||
+        msg.includes("Socket connection timeout")) {
+        return true; // Ignore these logs
+    }
+    return false;
+};
+
 process.on("uncaughtException", (err) => {
-  console.error("❌ Uncaught Exception:", err);
+  if (!logFilter(err)) {
+      console.error("❌ Uncaught Exception:", err);
+  }
 });
+
 process.on("unhandledRejection", (err) => {
-  console.error("❌ Unhandled Rejection:", err);
+  if (!logFilter(err)) {
+      console.error("❌ Unhandled Rejection:", err);
+  }
 });
 
 // ===== SYSTEM CONSTANTS =====
@@ -155,7 +173,7 @@ async function connectToWA() {
   const { version } = await fetchLatestBaileysVersion();
 
   const ranuxPro = makeWASocket({
-    logger: P({ level: 'silent' }),
+    logger: P({ level: 'silent' }), // Silent logger to hide Baileys noise
     printQRInTerminal: false,
     browser: Browsers.macOS("Safari"), 
     auth: state,
@@ -169,17 +187,14 @@ async function connectToWA() {
   });
 
   // 🔥 CORE OVERRIDE: FORCE CHANNEL FORWARD ON ALL MESSAGES 🔥
-  // This ensures EVERY message (Image/Text/Video) sent by the bot gets the channel context
   const originalSendMessage = ranuxPro.sendMessage;
   ranuxPro.sendMessage = async (jid, content, options = {}) => {
-      // Define Channel Context
       const newsletterContext = {
           newsletterJid: "120363405950699484@newsletter",
           newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
-          serverMessageId: 143 // Mock ID
+          serverMessageId: 143
       };
 
-      // Ensure content is an object and inject context
       if (typeof content === 'object' && content !== null) {
           if (!content.contextInfo) content.contextInfo = {};
           
@@ -188,7 +203,6 @@ async function connectToWA() {
           content.contextInfo.forwardedNewsletterMessageInfo = newsletterContext;
       }
 
-      // Call Original Function with modified content
       return await originalSendMessage.call(ranuxPro, jid, content, options);
   };
 
@@ -199,7 +213,7 @@ async function connectToWA() {
     if (connection === 'close') {
       const reason = lastDisconnect?.error?.output?.statusCode;
       if (reason !== DisconnectReason.loggedOut) {
-        console.log("⚠️ Connection lost. Reconnecting...");
+        // Suppress reconnection logs
         connectToWA();
       } else {
         console.log("❌ Session logged out. Please rescan.");
@@ -298,7 +312,7 @@ async function connectToWA() {
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(' ');
 
-      // Default reply (Now automatically enhanced by override)
+      // Reply function (Channel context injected via override above)
       const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
       // Group Metadata
@@ -327,7 +341,7 @@ async function connectToWA() {
           const emojis = ['🔥', '😎', '💜', '⚡', '💯'];
           const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
           try {
-             // Bypass override for status react to avoid errors
+             // Bypass override for status react
              await originalSendMessage.call(ranuxPro, mek.key.participant, { 
                 react: { text: randomEmoji, key: mek.key } 
              });
@@ -345,7 +359,16 @@ async function connectToWA() {
               await ranuxPro.sendMessage(botJid, {
                 [msgType === "imageMessage" ? "image" : "video"]: buffer,
                 caption: `📥 Forwarded Status from @${senderNumber}`,
-                mentions: [senderNumber + "@s.whatsapp.net"]
+                mentions: [senderNumber + "@s.whatsapp.net"],
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: "120363405950699484@newsletter",
+                        newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
+                        serverMessageId: 143
+                    }
+                }
               });
             }
         }
