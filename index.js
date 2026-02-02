@@ -30,7 +30,6 @@ const {
 const { commands, replyHandlers } = require('./command');
 
 // ===== ADVANCED LOG FILTERING (CLEAN CONSOLE) =====
-// This hides unnecessary Baileys "pending key" logs and conflicts
 const logFilter = (err) => {
     const msg = String(err);
     if (msg.includes("pending-key") || 
@@ -38,21 +37,17 @@ const logFilter = (err) => {
         msg.includes("Conflict") ||
         msg.includes("not-authorized") ||
         msg.includes("Socket connection timeout")) {
-        return true; // Ignore these logs
+        return true; 
     }
     return false;
 };
 
 process.on("uncaughtException", (err) => {
-  if (!logFilter(err)) {
-      console.error("❌ Uncaught Exception:", err);
-  }
+  if (!logFilter(err)) console.error("❌ Uncaught Exception:", err);
 });
 
 process.on("unhandledRejection", (err) => {
-  if (!logFilter(err)) {
-      console.error("❌ Unhandled Rejection:", err);
-  }
+  if (!logFilter(err)) console.error("❌ Unhandled Rejection:", err);
 });
 
 // ===== SYSTEM CONSTANTS =====
@@ -173,7 +168,7 @@ async function connectToWA() {
   const { version } = await fetchLatestBaileysVersion();
 
   const ranuxPro = makeWASocket({
-    logger: P({ level: 'silent' }), // Silent logger to hide Baileys noise
+    logger: P({ level: 'silent' }),
     printQRInTerminal: false,
     browser: Browsers.macOS("Safari"), 
     auth: state,
@@ -213,7 +208,6 @@ async function connectToWA() {
     if (connection === 'close') {
       const reason = lastDisconnect?.error?.output?.statusCode;
       if (reason !== DisconnectReason.loggedOut) {
-        // Suppress reconnection logs
         connectToWA();
       } else {
         console.log("❌ Session logged out. Please rescan.");
@@ -222,13 +216,20 @@ async function connectToWA() {
     } else if (connection === 'open') {
       console.log('✅ King RANUX PRO Connected!');
 
+      // ✅ FIX: Ensure Bot JID is correctly retrieved
       let botJid = ranuxPro.user?.id ? jidNormalizedUser(ranuxPro.user.id) : null;
       
+      // ✅ FIX: Wait a bit to ensure connection is fully established
       if (botJid) {
-        await ranuxPro.sendMessage(botJid, {
-          image: { url: config.ALIVE_IMG },
-          caption: buildConnectMessage(config, botJid)
-        }).catch(() => {});
+        setTimeout(async () => {
+            console.log(`📨 Sending Welcome Message to: ${botJid}`);
+            await ranuxPro.sendMessage(botJid, {
+              image: { url: config.ALIVE_IMG },
+              caption: buildConnectMessage(config, botJid)
+            }).catch((err) => console.log("⚠️ Welcome Msg Failed:", err.message));
+        }, 3000);
+      } else {
+        console.log("⚠️ Could not detect Bot JID for welcome message.");
       }
 
       setTimeout(() => autoFollowChannel(ranuxPro), 5000);
@@ -391,7 +392,7 @@ async function connectToWA() {
               reply
             });
           } catch (e) {
-            console.error(`❌ Error executing ${commandName}:`, e);
+            console.error(`❌ Error executing ${commandName}:`, e.message);
             reply("❌ Command Error: " + e.message);
           }
         }
