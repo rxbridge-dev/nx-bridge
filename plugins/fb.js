@@ -1,120 +1,87 @@
-const { cmd, commands } = require("../command");
+const { cmd } = require("../command");
 const getFbVideoInfo = require("@xaviabot/fb-downloader");
 
-const FOOTER = "\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱";
+// 🔥 GLOBAL FOOTER
+const FOOTER = "> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ";
 
 cmd(
   {
     pattern: "fb",
-    alias: ["facebook"],
+    alias: ["facebook", "fbdl"],
     react: "📘",
-    desc: "Download Facebook Video",
+    desc: "Download Facebook Videos",
     category: "download",
     filename: __filename,
   },
-  async (
-    ranuxPro,
-    mek,
-    m,
-    {
-      from,
-      quoted,
-      body,
-      isCmd,
-      command,
-      args,
-      q,
-      isGroup,
-      sender,
-      senderNumber,
-      botNumber2,
-      botNumber,
-      pushname,
-      isMe,
-      isOwner,
-      groupMetadata,
-      groupName,
-      participants,
-      groupAdmins,
-      isBotAdmins,
-      isAdmins,
-      reply,
-    }
-  ) => {
+  async (ranuxPro, mek, m, { q, reply, from }) => {
     try {
-      // ❌ No URL
-      if (!q) {
+      // 1. Validation: No URL
+      if (!q || !q.includes("facebook.com") && !q.includes("fb.watch")) {
         return reply(
-          "📘 *Facebook video download කිරීමට valid link එකක් දාන්න!*\n" +
-          "✨ *Example:* `fb https://www.facebook.com/...`" +
-          FOOTER
+          "❌ *Please provide a valid Facebook URL!*\n\n" +
+          "✨ *Example:* `.fb https://www.facebook.com/watch/?v=...`"
         );
       }
 
-      const fbRegex = /(https?:\/\/)?(www\.)?(facebook|fb)\.com\/.+/;
-      if (!fbRegex.test(q)) {
-        return reply(
-          "❌ *Invalid Facebook URL!*\n" +
-          "👉 *කරුණාකර හරි link එකක් check කරලා නැවත try කරන්න*" +
-          FOOTER
-        );
-      }
+      // 2. Processing Message (Reaction)
+      await ranuxPro.sendMessage(from, { react: { text: "⏳", key: mek.key } });
 
-      // ⏳ Downloading message
-      await reply(
-        "⬇️ *Facebook video download වෙමින් පවතිනවා…*\n" +
-        "⏳ *කරුණාකර ටිකක් රැඳී සිටින්න*" +
-        FOOTER
-      );
-
+      // 3. Fetch Video Data
       const result = await getFbVideoInfo(q);
+
+      // 4. Validation: No Result
       if (!result || (!result.sd && !result.hd)) {
-        return reply(
-          "😕 *Video download කරන්න බැරි වුණා!*\n" +
-          "🔁 *කරුණාකර ටික වෙලාවකට පස්සේ නැවත try කරන්න*" +
-          FOOTER
-        );
+        return reply("😕 *Failed to fetch video!* Please check the link or privacy settings.");
       }
 
-      const { title, sd, hd } = result;
-      const bestQualityUrl = hd || sd;
-      const qualityText = hd ? "HD" : "SD";
+      // 5. Extract Details
+      const title = result.title || "Facebook Video";
+      const bestQualityUrl = result.hd || result.sd;
+      const qualityText = result.hd ? "HD Quality" : "SD Quality";
+      const thumbnail = result.thumbnail || "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/file_00000000b5647209867894812e26b0e9.png";
 
-      const desc =
-`👑 *King RANUX PRO — FB Video Downloader*
-─────────────────────────
-🎬 *Title:* ${title || "Unknown"}
-🎥 *Quality:* ${qualityText}
-🔗 *Source:* Facebook
-${FOOTER}
-`;
+      // 6. 🔥 BUILD STYLISH CAPTION
+      let caption = `✨ *𝐊𝐈𝐍𝐆 𝐑𝐀𝐍𝐔𝐗 𝐏𝐑𝐎 𝐅𝐁 𝐃𝐋* ✨\n\n`;
+      caption += `👋 𝐇𝐞𝐲, 𝐇𝐞𝐫𝐞 𝐢𝐬 𝐲𝐨𝐮𝐫 𝐅𝐁 𝐕𝐢𝐝𝐞𝐨!\n\n`;
 
+      caption += `╭───〔 📘 *𝐕𝐈𝐃𝐄𝐎 𝐈𝐍𝐅𝐎* 〕───┈\n`;
+      caption += `│\n`;
+      caption += `│ 🎬 *𝐓𝐢𝐭𝐥𝐞* : ${title}\n`;
+      caption += `│ 🎞️ *𝐐𝐮𝐚𝐥𝐢𝐭𝐲* : ${qualityText}\n`;
+      caption += `│ 🔗 *𝐔𝐫𝐥* : Facebook.com\n`;
+      caption += `│\n`;
+      caption += `╰────────────────────┈\n\n`;
+
+      caption += `> ⬇️ *Downloading Video...*\n`;
+      caption += `${FOOTER}`;
+
+      // 7. Send Image + Caption
       await ranuxPro.sendMessage(
         from,
         {
-          image: {
-            url: "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/file_00000000b5647209867894812e26b0e9.png",
-          },
-          caption: desc,
+          image: { url: thumbnail },
+          caption: caption,
         },
         { quoted: mek }
       );
 
+      // 8. Send Video
       await ranuxPro.sendMessage(
         from,
         {
           video: { url: bestQualityUrl },
-          caption: `📥 *Downloaded in ${qualityText} quality*` + FOOTER,
+          caption: `✅ *Facebook Video Downloaded!*`,
+          mimetype: "video/mp4"
         },
         { quoted: mek }
       );
+
+      // 9. Success Reaction
+      await ranuxPro.sendMessage(from, { react: { text: "✅", key: mek.key } });
+
     } catch (e) {
       console.error(e);
-      reply(
-        "❌ *Facebook video download කිරීමේදී දෝෂයක් ඇතිවුණා!*\n" +
-        "🔁 *කරුණාකර ටික වෙලාවකට පස්සේ නැවත try කරන්න*" +
-        FOOTER
-      );
+      reply("❌ *Download Error!* Please try again later.");
     }
   }
 );
