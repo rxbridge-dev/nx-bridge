@@ -2,8 +2,10 @@ const { cmd } = require("../command");
 const os = require("os");
 const config = require("../config");
 
-// 🔥 BOT LOGO (Change if needed)
+// 🔥 NEW RESOURCES
 const LOGO_URL = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/king-ranux-pro-main-logo.png";
+// Using a highly compatible audio format for WhatsApp PTT
+const ALIVE_VOICE = "https://files.catbox.moe/0bvbbv.mp3"; 
 
 cmd({
     pattern: "alive",
@@ -14,85 +16,83 @@ cmd({
 },
 async (ranuxPro, mek, m, { from, pushname, reply }) => {
     try {
-        // 1. Get Bot Owner's Name (Auto Detect)
-        // ranuxPro.user.name = The WhatsApp name of the number running the bot
-        const botOwnerName = ranuxPro.user.name || config.OWNER_NUMBER || "Unknown User";
+        // --- 1. DATA COLLECTION ---
+        const senderName = pushname || "User";
+        const botOwnerName = config.OWNER_NAME || "Ransara Devnath";
+        
+        // Time & Date (Asia/Colombo)
+        const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Colombo" });
+        const date = new Date(now).toLocaleDateString("en-GB");
+        const time = new Date(now).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
 
-        // 2. Calculate Uptime
+        // Uptime
         const uptime = process.uptime();
         const days = Math.floor(uptime / (3600 * 24));
         const hours = Math.floor((uptime % (3600 * 24)) / 3600);
         const minutes = Math.floor((uptime % 3600) / 60);
         const seconds = Math.floor(uptime % 60);
 
-        // 3. Memory & System Info
+        // System Stats
         const usedMem = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
         const totalMem = (os.totalmem() / 1024 / 1024).toFixed(0);
-        const hostname = os.hostname();
+        
+        // Ping
+        const start = Date.now();
+        await ranuxPro.sendMessage(from, { react: { text: "⚡", key: mek.key } });
+        const end = Date.now();
+        const ping = end - start;
 
-        // 4. Date & Time (Sri Lanka)
-        const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Colombo" });
-        const date = new Date(now).toLocaleDateString("en-GB");
-        const time = new Date(now).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        // Greeting
+        const curHour = new Date().getHours();
+        let greeting = "ɢᴏᴏᴅ ɴɪɢʜᴛ 🌙";
+        if (curHour < 12) greeting = "ɢᴏᴏᴅ ᴍᴏʀɴɪɴɢ ⛅";
+        else if (curHour < 18) greeting = "ɢᴏᴏᴅ ᴀғᴛᴇʀɴᴏᴏɴ 🌞";
+        else greeting = "ɢᴏᴏᴅ ᴇᴠᴇɴɪɴɢ 🌆";
 
-        // 5. Config Data
-        const prefix = config.PREFIX || ".";
-        const mode = (config.MODE || "public").toUpperCase();
-
-        // 6. 🔥 ULTRA PREMIUM ALIVE MESSAGE DESIGN
+        // --- 2. THE ULTRA PREMIUM CAPTION ---
         const aliveMsg = `
-✨ *𝐊𝐈𝐍𝐆 𝐑𝐀𝐍𝐔𝐗 𝐏𝐑𝐎 𝐒𝐘𝐒𝐓𝐄𝐌 𝐎𝐍𝐋𝐈𝐍𝐄* ✨
+${greeting} ${senderName} 👋
 
-👋 ʜᴇʟʟᴏ *${pushname}*, ɪ ᴀᴍ ᴀᴄᴛɪᴠᴇ ɴᴏᴡ!
+╭─「 👑 *𝐊𝐈𝐍𝐆 𝐑𝐀𝐍𝐔𝐗 𝐏𝐑𝐎* 」
+│
+│ 🧑‍💻 *Status:* Online & Active
+│ 🚀 *Speed:* ${ping}ms
+│ 📅 *Date:* ${date}
+│ ⏰ *Time:* ${time}
+│
+├─「 👤 *USER INFO* 」
+│
+│ ◈ *User:* ${senderName}
+│ ◈ *Mode:* ${config.MODE || "Public"}
+│
+├─「 🤖 *SYSTEM INFO* 」
+│
+│ ◈ *Ram:* ${usedMem}MB / ${totalMem}MB
+│ ◈ *Uptime:* ${days}d ${hours}h ${minutes}m ${seconds}s
+│ ◈ *Platform:* ${os.platform().toUpperCase()}
+│ ◈ *Owner:* ${botOwnerName}
+│
+╰─「 *Stay Connected!* 」
 
-╭━━「 *👤 𝐇𝐎𝐒𝐓 𝐈𝐍𝐅𝐎* 」━━━●
-┃
-┃ 👑 *Bot Owner* : ${botOwnerName}
-┃ 🧬 *Prefix* : [ ${prefix} ]
-┃ ⚙️ *Mode* : ${mode}
-┃
-╰━━━━━━━━━━━━━━━━●
+📢 *Official Channel:*
+https://whatsapp.com/channel/0029VbC5zjdAojYzyAJS7U2S
 
-╭━━「 *📟 𝐒𝐘𝐒𝐓𝐄𝐌 𝐒𝐓𝐀𝐓𝐒* 」━━●
-┃
-┃ ⏰ *Uptime* : ${days}D ${hours}H ${minutes}M ${seconds}S
-┃ 💾 *Ram* : ${usedMem}MB / ${totalMem}MB
-┃ 🖥️ *Host* : ${hostname}
-┃
-╰━━━━━━━━━━━━━━━━●
-
-╭━━「 *📅 𝐃𝐀𝐓𝐄 & 𝐓𝐈𝐌𝐄* 」━━━●
-┃
-┃ 📆 *Date* : ${date}
-┃ ⌚ *Time* : ${time}
-┃
-╰━━━━━━━━━━━━━━━━●
-
-> 🚀 *Advanced, Fast & Secure WhatsApp Bot*
-> *© 2026 King RANUX PRO Inc.*
+> 👨‍💻 *Powered By MR.Ransara Devnath*
 `;
 
-        // 7. Send Message with AdReply (Card View)
+        // --- 3. SEND MESSAGE SEQUENCE ---
+
+        // Step 1: Send Voice Note (Fixed Mimetype)
+        await ranuxPro.sendMessage(from, {
+            audio: { url: ALIVE_VOICE },
+            mimetype: 'audio/mp4', // Changed to mp4/audio for better compatibility
+            ptt: true
+        }, { quoted: mek });
+
+        // Step 2: Send Image & Caption
         await ranuxPro.sendMessage(from, { 
             image: { url: LOGO_URL },
-            caption: aliveMsg,
-            contextInfo: {
-                forwardingScore: 9999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterName: '🚀 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 𝐍𝐞𝐰𝐬 🚀',
-                    newsletterJid: "120363405950699484@newsletter",
-                },
-                externalAdReply: {
-                    title: `👋 𝐇𝐢 ${botOwnerName}, 𝐈'𝐦 𝐀𝐥𝐢𝐯𝐞!`,
-                    body: "ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟ",
-                    thumbnailUrl: LOGO_URL,
-                    sourceUrl: "https://whatsapp.com/channel/0029VbC5zjdAojYzyAJS7U2S",
-                    mediaType: 1,
-                    renderLargerThumbnail: true,
-                    showAdAttribution: true
-                }
-            }
+            caption: aliveMsg.trim()
         }, { quoted: mek });
 
     } catch (e) {
