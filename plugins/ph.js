@@ -1,17 +1,17 @@
 const { cmd } = require("../command");
 const axios = require("axios");
 
-// Global State to store video details
+// Global State
 global.pendingPh = global.pendingPh || {};
 
 // 🔥 GLOBAL FOOTER
 const FOOTER = "> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ";
 
-// ===================== 1. FETCH DETAILS =====================
+// ===================== 1. FETCH & DOWNLOAD COMMAND =====================
 cmd({
     pattern: "phdl",
     alias: ["porn", "ph"],
-    desc: "Download Pornhub Videos (Direct)",
+    desc: "Download Pornhub Videos (Agatz API)",
     category: "download",
     react: "🔞",
     filename: __filename
@@ -23,92 +23,63 @@ async (ranuxPro, mek, m, { from, q, reply, sender }) => {
             return reply("❌ *Please provide a valid Pornhub link!*\n\nExample: `.phdl https://www.pornhub.com/view_video.php?viewkey=...`");
         }
 
-        // Clear previous session
-        if (global.pendingPh[sender]) delete global.pendingPh[sender];
-
+        // 🔥 IMMEDIATE REACTION (User Request)
         await ranuxPro.sendMessage(from, { react: { text: "⏳", key: mek.key } });
+        
+        // Inform User
+        await reply("🔄 *Processing Request...*");
 
-        // 2. Fetch from Stable API (Scrapes Direct MP4)
-        // මේ API එකෙන් කෙලින්ම source code එකෙන් data ඇදලා දෙනවා 1DM වගේ.
-        const apiUrl = `https://api.maher-zubair.tech/download/phub?url=${encodeURIComponent(q)}`;
+        // 2. Fetch Video Details (Using Agatz API - Currently Working)
+        const apiUrl = `https://api.agatz.xyz/api/phdl?url=${q}`;
         const { data } = await axios.get(apiUrl);
 
-        // 3. Check Data
-        if (!data || data.status !== 200 || !data.result) {
-            return reply("❌ *Unable to fetch video!* Try again later or check the link.");
+        // 3. Check API Response
+        if (!data || data.status !== 200 || !data.data) {
+            return reply("❌ *API Error!* Unable to fetch video details.");
         }
 
-        const result = data.result;
+        const videoData = data.data;
+        const videoTitle = videoData.video_title || "PH Video";
+        const videoUrl = videoData.videoUrl; // High Quality Link
+        const format = videoData.format || "mp4";
+
+        // 4. Update React to Downloading
+        await ranuxPro.sendMessage(from, { react: { text: "⬇️", key: mek.key } });
         
-        // 4. Store Data
-        global.pendingPh[sender] = {
-            title: result.title || "PH Video",
-            downloadUrl: result.data[0].url, // Best Quality Link
-            quality: result.data[0].quality || "HD",
-            thumbnail: result.thumbnail
-        };
+        // 5. Build Info Message
+        let infoMsg = `🔞 *𝐏𝐇 𝐕𝐈𝐃𝐄𝐎 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐑* 🔞\n\n`;
+        infoMsg += `🎬 *Title:* ${videoTitle}\n`;
+        infoMsg += `📼 *Quality:* High (Auto)\n`;
+        infoMsg += `⏳ *Status:* Downloading & Uploading...\n`;
+        infoMsg += `\n${FOOTER}`;
 
-        // 5. Build Stylish Message (Pro Card Design)
-        let msg = `🔞 *𝐏𝐇 𝐕𝐈𝐃𝐄𝐎 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐑* 🔞\n\n`;
-        
-        msg += `╭───〔 🎬 *𝐕𝐈𝐃𝐄𝐎 𝐈𝐍𝐅𝐎* 〕───┈\n`;
-        msg += `│\n`;
-        msg += `│ 🏷️ *𝐓𝐢𝐭𝐥𝐞* : ${result.title}\n`;
-        msg += `│ 👁️ *𝐕𝐢𝐞𝐰𝐬* : ${result.views_count}\n`;
-        msg += `│ ⏱️ *𝐃𝐮𝐫𝐚𝐭𝐢𝐨𝐧* : ${result.duration}\n`;
-        msg += `│ 📤 *𝐔𝐩𝐥𝐨𝐚𝐝𝐞𝐫* : ${result.uploader}\n`;
-        msg += `│\n`;
-        msg += `╰────────────────────┈\n\n`;
-
-        msg += `🔗 *Quality Available:* ${result.data[0].quality}\n`;
-        msg += `\n> *Reply with "1" to Download Video*`;
-        msg += `\n${FOOTER}`;
-
-        // 6. Send Message
+        // Send Info Image
         await ranuxPro.sendMessage(from, { 
-            image: { url: result.thumbnail },
-            caption: msg 
+            image: { url: "https://pomf2.lain.la/f/p753265n.jpg" }, // Default PH Image or scrape if avail
+            caption: infoMsg 
         }, { quoted: mek });
 
-    } catch (e) {
-        console.error("PHDL Error:", e);
-        reply("❌ *API Error!* Please try again later.");
-    }
-});
+        // 6. DOWNLOAD VIDEO BUFFER (Fix for Stream Errors)
+        // කෙලින්ම URL එක දෙන්නේ නැතුව Bot එකට Download කරලා යවනවා.
+        const response = await axios.get(videoUrl, { responseType: 'arraybuffer' });
 
-// ===================== 2. DOWNLOAD HANDLER =====================
-cmd({
-    on: "body"
-},
-async (ranuxPro, mek, m, { from, body, sender, reply }) => {
-    const session = global.pendingPh[sender];
-
-    // Validate Session
-    if (!session || body.trim() !== "1") return;
-
-    // Clear session
-    delete global.pendingPh[sender];
-
-    // 🔥 REACT IMMEDIATELY
-    await ranuxPro.sendMessage(from, { react: { text: "⬇️", key: mek.key } });
-
-    try {
-        await reply(`⬇️ *Downloading "${session.title}"... Please wait!*`);
-
-        // 🔥 BUFFER DOWNLOAD METHOD (No 500 Errors)
-        const videoBuffer = await axios.get(session.downloadUrl, { responseType: 'arraybuffer' });
-
+        // 7. Send Video File
         await ranuxPro.sendMessage(from, {
-            video: videoBuffer.data,
-            caption: `🔞 *${session.title}*\n\n✅ *Downloaded via King RANUX PRO*`,
+            video: response.data,
+            caption: `✅ *Downloaded via King RANUX PRO*`,
             mimetype: "video/mp4"
         }, { quoted: mek });
 
+        // Final Success React
         await ranuxPro.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (e) {
-        console.error("Download Error:", e);
-        // Fallback: Send direct link if upload fails
-        reply(`❌ *Upload Failed!* (File might be too large)\n\n🔗 *Direct Link:* ${session.downloadUrl}`);
+        console.error("PHDL Error:", e);
+        // Error Handling
+        if (e.code === 'ERR_BAD_REQUEST' || e.response?.status === 404) {
+             reply("❌ *Video Not Found!* Check the link.");
+        } else {
+             reply("❌ *Download Failed!* The file might be too large for WhatsApp.");
+        }
     }
 });
