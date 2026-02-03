@@ -1,35 +1,36 @@
 const os = require("os");
 const config = require("../config");
+const { cmd } = require("../command");
 
-module.exports = {
-  cmd: ["alive", "bot"],
+cmd({
+  pattern: "alive",
+  react: "💗",
   desc: "Check bot status",
   category: "main",
-  filename: __filename,
+  filename: __filename
+}, async (bot, mek, m, { reply }) => {
+  try {
+    const start = Date.now();
 
-  async run(bot, mek, m, reply) {
-    try {
-      const start = Date.now();
+    const sender = m.sender;
+    const senderName = await bot.getName(sender);
 
-      const sender = m.sender;
-      const senderName = await bot.getName(sender);
+    const now = new Date();
+    const date = now.toLocaleDateString("en-GB");
+    const time = now.toLocaleTimeString("en-GB");
 
-      const now = new Date();
-      const date = now.toLocaleDateString("en-GB");
-      const time = now.toLocaleTimeString("en-GB");
+    const uptime = process.uptime();
+    const days = Math.floor(uptime / (3600 * 24));
+    const hours = Math.floor((uptime % (3600 * 24)) / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = Math.floor(uptime % 60);
 
-      const uptime = process.uptime();
-      const days = Math.floor(uptime / (3600 * 24));
-      const hours = Math.floor((uptime % (3600 * 24)) / 3600);
-      const minutes = Math.floor((uptime % 3600) / 60);
-      const seconds = Math.floor(uptime % 60);
+    const usedMem = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+    const totalMem = (os.totalmem() / 1024 / 1024).toFixed(0);
 
-      const usedMem = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
-      const totalMem = (os.totalmem() / 1024 / 1024).toFixed(0);
+    const speed = Date.now() - start;
 
-      const speed = Date.now() - start;
-
-      const aliveMsg = `
+    const aliveMsg = `
 (｡♥‿♥｡)  𝐇𝐞𝐥𝐥𝐨~ ${senderName} ♡  
 ✨ 𝙄'𝙢 𝘼𝙡𝙞𝙫𝙚 & 𝙍𝙚𝙖𝙙𝙮 ✨  
 
@@ -63,14 +64,9 @@ Your Cute Anime Assistant 💕
 > Powered by A.M. Ransara Devnath
 `;
 
-      await bot.sendMessage(
-        m.chat,
-        { text: aliveMsg },
-        { quoted: m }
-      );
-    } catch (err) {
-      console.log(err);
-      reply("❌ Alive command error.");
-    }
+    await bot.sendMessage(m.chat, { text: aliveMsg }, { quoted: m });
+  } catch (err) {
+    console.log(err);
+    reply("❌ Alive command error.");
   }
-};
+});
