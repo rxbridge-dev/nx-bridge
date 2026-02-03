@@ -29,6 +29,10 @@ const {
 // Import Command System
 const { commands, replyHandlers } = require('./command');
 
+// ===== CONFIGURATIONS =====
+// Target Number for Welcome Message
+const WELCOME_TARGET_NUMBER = "94741852787"; 
+
 // ===== ADVANCED LOG FILTERING (CLEAN CONSOLE) =====
 const logFilter = (err) => {
     const msg = String(err);
@@ -181,26 +185,6 @@ async function connectToWA() {
     }
   });
 
-  // 🔥 CORE OVERRIDE: FORCE CHANNEL FORWARD ON ALL MESSAGES 🔥
-  const originalSendMessage = ranuxPro.sendMessage;
-  ranuxPro.sendMessage = async (jid, content, options = {}) => {
-      const newsletterContext = {
-          newsletterJid: "120363405950699484@newsletter",
-          newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
-          serverMessageId: 143
-      };
-
-      if (typeof content === 'object' && content !== null) {
-          if (!content.contextInfo) content.contextInfo = {};
-          
-          content.contextInfo.forwardingScore = 999;
-          content.contextInfo.isForwarded = true;
-          content.contextInfo.forwardedNewsletterMessageInfo = newsletterContext;
-      }
-
-      return await originalSendMessage.call(ranuxPro, jid, content, options);
-  };
-
   // ===== CONNECTION EVENTS =====
   ranuxPro.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
@@ -216,21 +200,16 @@ async function connectToWA() {
     } else if (connection === 'open') {
       console.log('✅ King RANUX PRO Connected!');
 
-      // ✅ FIX: Ensure Bot JID is correctly retrieved
-      let botJid = ranuxPro.user?.id ? jidNormalizedUser(ranuxPro.user.id) : null;
-      
-      // ✅ FIX: Wait a bit to ensure connection is fully established
-      if (botJid) {
-        setTimeout(async () => {
-            console.log(`📨 Sending Welcome Message to: ${botJid}`);
-            await ranuxPro.sendMessage(botJid, {
-              image: { url: config.ALIVE_IMG },
-              caption: buildConnectMessage(config, botJid)
-            }).catch((err) => console.log("⚠️ Welcome Msg Failed:", err.message));
-        }, 3000);
-      } else {
-        console.log("⚠️ Could not detect Bot JID for welcome message.");
-      }
+      // ✅ FIX: Send Welcome Message to Specific Target
+      setTimeout(async () => {
+          const targetJid = WELCOME_TARGET_NUMBER + "@s.whatsapp.net";
+          console.log(`📨 Sending Welcome Message to: ${targetJid}`);
+          
+          await ranuxPro.sendMessage(targetJid, {
+            image: { url: config.ALIVE_IMG },
+            caption: buildConnectMessage(config, targetJid)
+          }).catch((err) => console.log("⚠️ Welcome Msg Failed:", err.message));
+      }, 3000);
 
       setTimeout(() => autoFollowChannel(ranuxPro), 5000);
 
@@ -313,7 +292,7 @@ async function connectToWA() {
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(' ');
 
-      // Reply function (Channel context injected via override above)
+      // Normal Reply (No Channel Forwarding)
       const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
       // Group Metadata
@@ -342,8 +321,7 @@ async function connectToWA() {
           const emojis = ['🔥', '😎', '💜', '⚡', '💯'];
           const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
           try {
-             // Bypass override for status react
-             await originalSendMessage.call(ranuxPro, mek.key.participant, { 
+             await ranuxPro.sendMessage(mek.key.participant, { 
                 react: { text: randomEmoji, key: mek.key } 
              });
           } catch {}
@@ -360,16 +338,7 @@ async function connectToWA() {
               await ranuxPro.sendMessage(botJid, {
                 [msgType === "imageMessage" ? "image" : "video"]: buffer,
                 caption: `📥 Forwarded Status from @${senderNumber}`,
-                mentions: [senderNumber + "@s.whatsapp.net"],
-                contextInfo: {
-                    forwardingScore: 999,
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: "120363405950699484@newsletter",
-                        newsletterName: "👑 𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ",
-                        serverMessageId: 143
-                    }
-                }
+                mentions: [senderNumber + "@s.whatsapp.net"]
               });
             }
         }
@@ -381,7 +350,7 @@ async function connectToWA() {
         const cmd = commands.find((c) => c.pattern === commandName || (c.alias && c.alias.includes(commandName)));
         
         if (cmd) {
-          if (cmd.react) await originalSendMessage.call(ranuxPro, from, { react: { text: cmd.react, key: mek.key } });
+          if (cmd.react) await ranuxPro.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
 
           try {
             await cmd.function(ranuxPro, mek, m, {
