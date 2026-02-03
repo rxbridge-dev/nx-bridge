@@ -8,12 +8,12 @@ cmd({
   desc: "Check bot status",
   category: "main",
   filename: __filename
-}, async (bot, mek, m, { reply }) => {
+}, async (bot, mek, m, { reply, pushname }) => {
   try {
     const start = Date.now();
 
-    const sender = m.sender;
-    const senderName = await bot.getName(sender);
+    // Fallback safe name
+    const senderName = pushname || "User";
 
     const now = new Date();
     const date = now.toLocaleDateString("en-GB");
@@ -65,8 +65,9 @@ Your Cute Anime Assistant 💕
 `;
 
     await bot.sendMessage(m.chat, { text: aliveMsg }, { quoted: m });
+
   } catch (err) {
-    console.log(err);
+    console.log("Alive Error:", err);
     reply("❌ Alive command error.");
   }
 });
