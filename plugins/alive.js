@@ -1,6 +1,7 @@
 const os = require("os");
-const config = require("../config");
 const { cmd } = require("../command");
+
+const ALIVE_LOGO = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/king-ranux-pro-main-logo.png";
 
 cmd({
   pattern: "alive",
@@ -11,8 +12,6 @@ cmd({
 }, async (bot, mek, m, { reply, pushname }) => {
   try {
     const start = Date.now();
-
-    // Fallback safe name
     const senderName = pushname || "User";
 
     const now = new Date();
@@ -20,8 +19,8 @@ cmd({
     const time = now.toLocaleTimeString("en-GB");
 
     const uptime = process.uptime();
-    const days = Math.floor(uptime / (3600 * 24));
-    const hours = Math.floor((uptime % (3600 * 24)) / 3600);
+    const days = Math.floor(uptime / 86400);
+    const hours = Math.floor((uptime % 86400) / 3600);
     const minutes = Math.floor((uptime % 3600) / 60);
     const seconds = Math.floor(uptime % 60);
 
@@ -45,8 +44,6 @@ Your Cute Anime Assistant 💕
 ╭────── 𝓢𝔂𝓼𝓽𝓮𝓶 ──────╮
 │ 👤 User : ${senderName}
 │ ⚡ Speed : ${speed} ms
-│ 🔑 Prefix : ${config.PREFIX || "."}
-│ 🧾 Version : ${config.VERSION || "1.0.0"}
 │ 🖥 OS : ${os.platform()}
 │ 🌐 Host : ${os.hostname()}
 │ ⏱ Uptime : ${days}d ${hours}h ${minutes}m ${seconds}s
@@ -54,9 +51,9 @@ Your Cute Anime Assistant 💕
 ╰─────────────────────╯
 
 ╭────── 𝓕𝓮𝓪𝓽𝓾𝓻𝓮𝓼 ─────╮
-│ 🚮 Anti Delete : ${config.ANTI_DELETE ? "ON 💖" : "OFF 💔"}
-│ 👁 Auto Status : ${config.AUTO_STATUS_SEEN ? "ON 💖" : "OFF 💔"}
-│ 📤 Auto Forward : ${config.AUTO_STATUS_FORWARD ? "ON 💖" : "OFF 💔"}
+│ 🚮 Anti Delete : ON 💖
+│ 👁 Auto Status : ON 💖
+│ 📤 Auto Forward : ON 💖
 ╰─────────────────────╯
 
 (づ｡◕‿‿◕｡)づ  Always here for you ♡  
@@ -64,10 +61,17 @@ Your Cute Anime Assistant 💕
 > Powered by A.M. Ransara Devnath
 `;
 
-    await bot.sendMessage(m.chat, { text: aliveMsg }, { quoted: m });
+    await bot.sendMessage(
+      m.chat,
+      {
+        image: { url: ALIVE_LOGO },
+        caption: aliveMsg
+      },
+      { quoted: m }
+    );
 
-  } catch (err) {
-    console.log("Alive Error:", err);
-    reply("❌ Alive command error.");
+  } catch (e) {
+    console.log("Alive Error:", e);
+    reply("❌ Alive command crashed.");
   }
 });

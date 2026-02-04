@@ -1,6 +1,7 @@
 const { cmd } = require('../command');
-const jimp = require('jimp');
 const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
+// Use require('jimp') directly as it might be CommonJS or ESM based on version
+const Jimp = require('jimp');
 
 // Design Elements
 const FOOTER = "> Powered by King RANUX PRO";
@@ -9,8 +10,9 @@ const FOOTER = "> Powered by King RANUX PRO";
 // HELPER: PROCESS IMAGE (SMART CROP & RESIZE)
 // ===============================================================
 async function generateProfilePicture(buffer) {
-    // Read the image
-    const image = await jimp.read(buffer);
+    // Read the image (Support both Jimp constructor and read method)
+    const image = await (Jimp.read ? Jimp.read(buffer) : new Jimp(buffer));
+    
     const width = image.bitmap.width;
     const height = image.bitmap.height;
     
@@ -18,14 +20,13 @@ async function generateProfilePicture(buffer) {
     const res = width > height ? width : height;
     
     // Create a new blank image with transparent/black background
-    const finalImage = await new jimp(res, res, 0x00000000); 
+    const finalImage = new Jimp(res, res, 0x00000000); 
     
     // Center the original image on the new square canvas
-    // Logic: (Canvas_Size - Image_Size) / 2 = Center Position
     await finalImage.composite(image, (res - width) / 2, (res - height) / 2);
     
     // Return the processed image buffer
-    return await finalImage.getBufferAsync(jimp.MIME_JPEG);
+    return await finalImage.getBufferAsync(Jimp.MIME_JPEG);
 }
 
 // ===============================================================
@@ -45,17 +46,11 @@ async (bot, mek, m, { from, isOwner, reply }) => {
         if (!isOwner) return reply("*❌ This command is for the Bot Owner only!*");
 
         // 2. Advanced Media Detection logic
-        // Checks if it's a Quoted Image OR an Image with Caption
         let mediaMessage = null;
 
         if (mek.message.imageMessage) {
-            // Case 1: Image sent with caption
             mediaMessage = mek.message.imageMessage;
-        } else if (mek.message.extendedTextMessage && 
-                   mek.message.extendedTextMessage.contextInfo && 
-                   mek.message.extendedTextMessage.contextInfo.quotedMessage && 
-                   mek.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage) {
-            // Case 2: Reply to an image
+        } else if (mek.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage) {
             mediaMessage = mek.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
         }
 
@@ -76,9 +71,7 @@ async (bot, mek, m, { from, isOwner, reply }) => {
         const finalBuffer = await generateProfilePicture(buffer);
 
         // 5. Update Profile Picture
-        // FIX: Use jidNormalizedUser to get the correct bot JID (removes :device_id)
         const botJid = jidNormalizedUser(bot.user.id);
-        
         await bot.updateProfilePicture(botJid, finalBuffer);
 
         await reply(`*✅ Full Profile Picture Updated Successfully!*\n\n${FOOTER}`);
