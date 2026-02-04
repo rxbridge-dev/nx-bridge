@@ -1,94 +1,77 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
 
-const FOOTER = "\n\n> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱";
+// Design Elements
+const FOOTER = "> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ";
+// High Quality YouTube Banner Image
+const HEADER_IMG = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/file_00000000d338720986013270eb1ecec5.png";
 
 cmd(
   {
     pattern: "yts",
-    alias: ["yts", "youtubesearch"],
+    alias: ["youtubesearch", "search", "ytsearch"],
     react: "🔎",
     desc: "Search YouTube videos",
     category: "search",
     filename: __filename,
   },
-  async (
-    ranuxPro,
-    mek,
-    m,
-    {
-      from,
-      quoted,
-      q,
-      reply,
-    }
-  ) => {
+  async (ranuxPro, mek, m, { from, q, reply }) => {
     try {
-      // ❌ No search query
+      // 1. Validation
       if (!q) {
-        return reply(
-          "🔎 *YouTube සෙවීමට keyword එකක් දාන්න!*\n" +
-          "✨ *Example:* `yts Alan Walker`" +
-          FOOTER
-        );
+        return reply(`*ℹ️ Please provide a keyword to search.*\n\n*Example:* \`.yts Alan Walker\``);
       }
 
-      // ⌛ Searching message
-      await reply(
-        "🔍 *YouTube එකේ හොයමින්…*\n" +
-        "⏳ *ඔයාට හොඳම results ටික අරගෙන එනවා*" +
-        FOOTER
-      );
+      // 2. Searching Message
+      await reply(`*⏳ Searching YouTube for "${q}"... Please wait.*`);
 
       const search = await yts(q);
 
-      // ❌ No results
+      // 3. Check Results
       if (!search || !search.all || search.all.length === 0) {
-        return reply(
-          "😕 *YouTube එකේ results හමු වුණේ නැහැ!*\n" +
-          "👉 *වෙන keyword එකක් try කරලා බලන්න*" +
-          FOOTER
-        );
+        return reply(`*❌ No results found matching your query.*`);
       }
 
+      // 4. Format Results (Top 10)
       const results = search.videos.slice(0, 10);
 
-      const formattedResults = results
-        .map(
-          (v, i) =>
-            `🎬 *${i + 1}. ${v.title}*\n` +
-            `⏱️ Duration: ${v.timestamp} | 👁️ Views: ${v.views.toLocaleString()}\n` +
-            `📅 Uploaded: ${v.ago}\n` +
-            `🔗 Watch: ${v.url}`
-        )
-        .join("\n\n");
-
-      const caption =
-`👑 *King RANUX PRO — YouTube Search Results*
-─────────────────────────
-🔎 *Search Query:* ${q}
-
-${formattedResults}
-${FOOTER}
+      let caption = `
+╭───〔 🔎 *𝐘𝐎𝐔𝐓𝐔𝐁𝐄 𝐒𝐄𝐀𝐑𝐂𝐇* 〕───┈
+│
+│ 🔍 *Search Results For:* "${q}"
+│ 📹 *Found:* ${results.length} Videos
+│
+╰──────────────────────┈
 `;
 
+      results.forEach((v, i) => {
+        caption += `
+╭─〔 🎬 *RESULT ${i + 1}* 〕
+│
+│ 🏷️ *Title:* ${v.title}
+│ ⏱️ *Duration:* ${v.timestamp}
+│ 👀 *Views:* ${v.views.toLocaleString()}
+│ 📅 *Uploaded:* ${v.ago}
+│ 🔗 *Link:* ${v.url}
+│
+╰──────────────────────┈`;
+      });
+
+      caption += `\n${FOOTER}`;
+
+      // 5. Send Result
       await ranuxPro.sendMessage(
         from,
         {
-          image: {
-            url: "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/file_00000000d338720986013270eb1ecec5.png",
-          },
-          caption,
+          image: { url: HEADER_IMG },
+          caption: caption.trim(),
         },
         { quoted: mek }
       );
+
     } catch (err) {
-      console.error(err);
-      reply(
-        "❌ *YouTube search එකේ දෝෂයක් ඇතිවුණා!*\n" +
-        "🔁 *කරුණාකර ටික වෙලාවකට පස්සේ නැවත try කරන්න*" +
-        FOOTER
-      );
+      console.error("YTS ERROR:", err);
+      reply(`*❌ An error occurred during the search.*\n\n${err.message}`);
     }
   }
 );

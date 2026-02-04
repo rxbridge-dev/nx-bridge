@@ -1,41 +1,31 @@
+--- START OF FILE wallpaper.js ---
+
 const { cmd } = require("../command");
 const axios = require("axios");
+
+// Design Elements
+const FOOTER = "> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ";
+const HEADER_IMG = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/file_0000000053d472089dec2fa0af565d4d.png";
 
 cmd(
   {
     pattern: "wall",
-    alias: ["wallpaper"],
-    react: "🖼️",
+    alias: ["wallpaper", "wp", "img"],
+    react: "🫟",
     desc: "Download HD Wallpapers",
     category: "download",
     filename: __filename,
   },
-  async (
-    conn,
-    mek,
-    m,
-    {
-      from,
-      q,
-      reply,
-    }
-  ) => {
+  async (conn, mek, m, { from, q, reply }) => {
     try {
+      // 1. Input Validation
       if (!q) {
-        return reply(
-          "🖼️ *HD Wallpaper Downloader*\n\n" +
-          "කරුණාකර wallpaper search කරන්න keyword එකක් type කරන්න.\n\n" +
-          "_Example:_ `.wall anime`\n\n" +
-          "> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱"
-        );
+        return reply(`*ℹ️ Please provide a keyword.*\n\n*Example:* \`.wall anime girl\``);
       }
 
-      await reply(
-        "🔍 *Searching HD Wallpapers...*\n" +
-        "Please wait a moment ⏳\n\n" +
-        "> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱"
-      );
+      await reply(`*⏳ Searching for "${q}"... Please wait.*`);
 
+      // 2. Fetch Data (Wallhaven API)
       const res = await axios.get(
         `https://wallhaven.cc/api/v1/search?q=${encodeURIComponent(
           q
@@ -44,54 +34,57 @@ cmd(
 
       const wallpapers = res.data.data;
 
+      // 3. Check Results
       if (!wallpapers || wallpapers.length === 0) {
-        return reply(
-          "❌ *No HD wallpapers found!*\n\n" +
-          "Try a different keyword.\n\n" +
-          "> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱"
-        );
+        return reply(`*❌ No HD wallpapers found for "${q}".*`);
       }
 
-      const selected = wallpapers.slice(0, 5);
+      const selected = wallpapers.slice(0, 5); // Get Top 5
+
+      // 4. Send Summary Message
+      let summaryMsg = `
+╭─「 🎨 *WALLPAPER SEARCH* 」
+│
+│ 🔎 *Keyword:* ${q}
+│ 📸 *Found:* ${selected.length} Premium Images
+│
+╰─「 *Sending files...* 」`;
 
       await conn.sendMessage(
         from,
         {
-          image: {
-            url: "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/file_0000000053d472089dec2fa0af565d4d.png",
-          },
-          caption:
-            "🖼️ *KING RANUX PRO – WALLPAPER DOWNLOADER*\n\n" +
-            `🔎 Keyword: *${q}*\n` +
-            `📂 Results: *${selected.length} HD Wallpapers*\n\n` +
-            "> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱",
+          image: { url: HEADER_IMG },
+          caption: summaryMsg.trim(),
         },
         { quoted: mek }
       );
 
+      // 5. Send Images Loop
       for (const wallpaper of selected) {
-        const caption =
-          "🖼️ *HD Wallpaper*\n\n" +
-          `📐 Resolution: *${wallpaper.resolution}*\n` +
-          `🔗 Source: ${wallpaper.url}\n\n` +
-          "> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱";
+        const caption = `
+╭─「 🖼️ *HD WALLPAPER* 」
+│
+│ 📐 *Res:* ${wallpaper.resolution}
+│ 📁 *Category:* ${wallpaper.category}
+│ 🔗 *Source:* Wallhaven
+│
+╰─「 *King RANUX PRO* 」
+
+${FOOTER}`;
 
         await conn.sendMessage(
           from,
           {
             image: { url: wallpaper.path },
-            caption,
+            caption: caption.trim(),
           },
           { quoted: mek }
         );
       }
+
     } catch (e) {
-      console.error(e);
-      reply(
-        "❌ *Wallpaper download failed!*\n\n" +
-        "Please try again later.\n\n" +
-        "> 𝓜𝓪𝓭𝓮 𝓑𝔂 𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱"
-      );
+      console.error("WALLPAPER ERROR:", e);
+      reply(`*❌ An error occurred during the search.*\n\n${e.message}`);
     }
   }
 );

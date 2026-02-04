@@ -58,7 +58,7 @@ Your Cute Anime Assistant 💕
 
 (づ｡◕‿‿◕｡)づ  Always here for you ♡  
 
-> Powered by A.M. Ransara Devnath
+> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ
 `;
 
     await bot.sendMessage(
