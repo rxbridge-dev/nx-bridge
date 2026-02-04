@@ -1,5 +1,3 @@
---- START OF FILE wallpaper.js ---
-
 const { cmd } = require("../command");
 const axios = require("axios");
 

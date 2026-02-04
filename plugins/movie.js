@@ -1,5 +1,3 @@
---- START OF FILE movie.js ---
-
 const { cmd } = require("../command");
 const puppeteer = require("puppeteer");
 const config = require("../config");
