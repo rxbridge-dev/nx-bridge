@@ -1,7 +1,6 @@
 const { cmd } = require('../command');
 const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
-// Use require('jimp') directly as it might be CommonJS or ESM based on version
-const Jimp = require('jimp');
+const { Jimp } = require('jimp'); // Destructure Jimp class correctly
 
 // Design Elements
 const FOOTER = "> Powered by King RANUX PRO";
@@ -10,23 +9,25 @@ const FOOTER = "> Powered by King RANUX PRO";
 // HELPER: PROCESS IMAGE (SMART CROP & RESIZE)
 // ===============================================================
 async function generateProfilePicture(buffer) {
-    // Read the image (Support both Jimp constructor and read method)
-    const image = await (Jimp.read ? Jimp.read(buffer) : new Jimp(buffer));
-    
+    // Read the image
+    const image = await Jimp.read(buffer);
     const width = image.bitmap.width;
     const height = image.bitmap.height;
     
-    // Select the largest dimension to make a perfect square
-    const res = width > height ? width : height;
+    // Select the largest dimension
+    const res = Math.max(width, height);
     
-    // Create a new blank image with transparent/black background
-    const finalImage = new Jimp(res, res, 0x00000000); 
+    // Create new blank image (black background)
+    const finalImage = new Jimp({ width: res, height: res, color: 0x00000000 });
     
-    // Center the original image on the new square canvas
-    await finalImage.composite(image, (res - width) / 2, (res - height) / 2);
+    // Center the original image
+    const x = Math.floor((res - width) / 2);
+    const y = Math.floor((res - height) / 2);
     
-    // Return the processed image buffer
-    return await finalImage.getBufferAsync(Jimp.MIME_JPEG);
+    finalImage.composite(image, x, y);
+    
+    // Return processed buffer
+    return await finalImage.getBuffer("image/jpeg");
 }
 
 // ===============================================================
@@ -42,12 +43,9 @@ cmd({
 },
 async (bot, mek, m, { from, isOwner, reply }) => {
     try {
-        // 1. Permission Check
         if (!isOwner) return reply("*❌ This command is for the Bot Owner only!*");
 
-        // 2. Advanced Media Detection logic
         let mediaMessage = null;
-
         if (mek.message.imageMessage) {
             mediaMessage = mek.message.imageMessage;
         } else if (mek.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage) {
@@ -60,18 +58,15 @@ async (bot, mek, m, { from, isOwner, reply }) => {
 
         await reply("*🔄 Processing full profile picture... Please wait.*");
 
-        // 3. Download the Image Stream
         const stream = await downloadContentFromMessage(mediaMessage, 'image');
         let buffer = Buffer.from([]);
         for await (const chunk of stream) {
             buffer = Buffer.concat([buffer, chunk]);
         }
 
-        // 4. Process Image using JIMP
         const finalBuffer = await generateProfilePicture(buffer);
-
-        // 5. Update Profile Picture
         const botJid = jidNormalizedUser(bot.user.id);
+        
         await bot.updateProfilePicture(botJid, finalBuffer);
 
         await reply(`*✅ Full Profile Picture Updated Successfully!*\n\n${FOOTER}`);
