@@ -7,7 +7,8 @@ const {
   fetchLatestBaileysVersion,
   Browsers,
   downloadContentFromMessage,
-  makeInMemoryStore
+  makeInMemoryStore,
+  delay
 } = require('@whiskeysockets/baileys');
 
 const fs = require('fs');
@@ -30,17 +31,17 @@ const {
 const { commands, replyHandlers } = require('./command');
 
 // ===== CONFIGURATIONS =====
-// Target Number for Welcome Message
-const WELCOME_TARGET_NUMBER = "94741852787"; 
+const WELCOME_TARGET_NUMBER = "94726880784"; // Owner Number for Connect Msg
 
-// ===== ADVANCED LOG FILTERING (CLEAN CONSOLE) =====
+// ===== GLOBAL ERROR HANDLING =====
 const logFilter = (err) => {
     const msg = String(err);
     if (msg.includes("pending-key") || 
         msg.includes("rate-overlimit") || 
         msg.includes("Conflict") ||
         msg.includes("not-authorized") ||
-        msg.includes("Socket connection timeout")) {
+        msg.includes("Socket connection timeout") ||
+        msg.includes("Stream Errored")) {
         return true; 
     }
     return false;
@@ -49,7 +50,6 @@ const logFilter = (err) => {
 process.on("uncaughtException", (err) => {
   if (!logFilter(err)) console.error("❌ Uncaught Exception:", err);
 });
-
 process.on("unhandledRejection", (err) => {
   if (!logFilter(err)) console.error("❌ Unhandled Rejection:", err);
 });
@@ -64,12 +64,12 @@ let ownerConfig = config.OWNER_NUMBER || '94726880784';
 const ownerNumber = Array.isArray(ownerConfig) ? ownerConfig : [ownerConfig];
 const MASTER_SUDO = ownerNumber; 
 
-// ===== ANTI DELETE & PLUGIN HOOKS =====
+// ===== ANTI DELETE PLUGIN SETUP =====
 const antiDeletePlugin = require('./plugins/antidelete.js');
 global.pluginHooks = global.pluginHooks || [];
 global.pluginHooks.push(antiDeletePlugin);
 
-// ================= SESSION RESTORE (BASE64 + MEGA FALLBACK) =================
+// ================= SESSION RESTORE (STABLE HYBRID METHOD) =================
 async function ensureSessionFile() {
   if (!fs.existsSync(credsPath)) {
     if (!config.SESSION_ID) {
@@ -77,6 +77,7 @@ async function ensureSessionFile() {
       process.exit(1);
     }
 
+    // 1. Try Base64 Decoding First (Most Stable)
     try {
         let sessionData = config.SESSION_ID;
         const prefixes = ["King RANUX PRO ~", "𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ ~"];
@@ -100,6 +101,7 @@ async function ensureSessionFile() {
         console.log("⚠️ Base64 restore failed, trying MEGA...");
     }
 
+    // 2. Fallback to MEGA (Test Bot Method)
     console.log("🔄 Downloading session from MEGA...");
     try {
       const filer = File.fromURL(`https://mega.nz/file/${config.SESSION_ID}`);
@@ -130,36 +132,8 @@ async function autoFollowChannel(ranuxPro) {
     if (!meta?.id) return;
     const myRole = meta.viewer_metadata?.role || "GUEST";
     if (myRole !== "GUEST") return;
-    console.log("➕ Auto Follow: Joining official channel...");
     await ranuxPro.newsletterFollow(meta.id);
-    console.log("✅ Auto Follow: Success!");
   } catch (e) {}
-}
-
-// ================= CONNECT PANEL INFO =================
-function buildConnectMessage(config, userJid) {
-  const ramUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
-  const totalRam = (os.totalmem() / 1024 / 1024).toFixed(0);
-  const user = userJid ? userJid.split("@")[0] : "Unknown";
-  
-  return `
-╔════════════════════════╗
-   🔮 *KING RANUX PRO*
-      *SYSTEM ONLINE*
-╚════════════════════════╝
-
-👋 *Welcome Back, Commander!*
-👤 *User:* @${user}
-🌐 *Mode:* ${config.MODE || "public"}
-🔑 *Prefix:* [ ${config.PREFIX || "."} ]
-
-📊 *SYSTEM DIAGNOSTICS*
-💾 *RAM:* ${ramUsage}MB / ${totalRam}MB
-🛡️ *Anti-Delete:* ${config.ANTI_DELETE ? "Active ✅" : "Disabled ❌"}
-👁️ *Auto Read:* ${config.AUTO_STATUS_SEEN ? "Active ✅" : "Disabled ❌"}
-
-> 🚀 System is ready to serve.
-`;
 }
 
 // ================= MAIN CONNECTION LOGIC =================
@@ -200,19 +174,18 @@ async function connectToWA() {
     } else if (connection === 'open') {
       console.log('✅ King RANUX PRO Connected!');
 
-      // ✅ FIX: Send Welcome Message to Specific Target
-      setTimeout(async () => {
-          const targetJid = WELCOME_TARGET_NUMBER + "@s.whatsapp.net";
-          console.log(`📨 Sending Welcome Message to: ${targetJid}`);
-          
-          await ranuxPro.sendMessage(targetJid, {
-            image: { url: config.ALIVE_IMG },
-            caption: buildConnectMessage(config, targetJid)
-          }).catch((err) => console.log("⚠️ Welcome Msg Failed:", err.message));
-      }, 3000);
+      // --- 1. SEND WELCOME MESSAGE (Test Bot Style) ---
+      const botJid = jidNormalizedUser(ranuxPro.user.id);
+      const targetJid = WELCOME_TARGET_NUMBER + "@s.whatsapp.net";
+      
+      const upMsg = `👑 *King RANUX PRO Connected* ✅\n\nPrefix: ${config.PREFIX || "."}\nMode: ${config.MODE || "Public"}`;
+      
+      await ranuxPro.sendMessage(targetJid, {
+        image: { url: config.ALIVE_IMG },
+        caption: upMsg
+      }).catch((e) => console.log("⚠️ Welcome Msg Error:", e.message));
 
-      setTimeout(() => autoFollowChannel(ranuxPro), 5000);
-
+      // --- 2. LOAD PLUGINS (Test Bot Style) ---
       const pluginPath = path.join(__dirname, "plugins");
       if (fs.existsSync(pluginPath)) {
         fs.readdirSync(pluginPath).forEach((plugin) => {
@@ -220,12 +193,15 @@ async function connectToWA() {
             try {
               require(path.join(pluginPath, plugin));
             } catch (e) {
-              console.error(`❌ Failed to load plugin: ${plugin}`, e.message);
+              console.error(`❌ Plugin Error: ${plugin}`, e.message);
             }
           }
         });
         console.log("🧩 Plugins Loaded Successfully.");
       }
+
+      // --- 3. AUTO FOLLOW ---
+      setTimeout(() => autoFollowChannel(ranuxPro), 5000);
     }
   });
 
@@ -235,9 +211,7 @@ async function connectToWA() {
   ranuxPro.ev.on('messages.upsert', async ({ messages }) => {
     try {
       for (const msg of messages) {
-         if (msg.messageStubType === 68) {
-            await ranuxPro.sendMessageAck(msg.key);
-         }
+         if (msg.messageStubType === 68) await ranuxPro.sendMessageAck(msg.key);
       }
 
       const mek = messages[0];
@@ -248,15 +222,13 @@ async function connectToWA() {
         ? mek.message.ephemeralMessage.message
         : mek.message;
 
+      // Basic Info Extraction
       const from = mek.key.remoteJid;
       const isGroup = from.endsWith('@g.us');
+      const botJid = jidNormalizedUser(ranuxPro.user.id);
+      const botNumber = botJid.split(':')[0];
       
-      const botJid = ranuxPro.user?.id ? jidNormalizedUser(ranuxPro.user.id) : null;
-      const botNumber = botJid ? botJid.split(':')[0] : "unknown";
-
-      const sender = mek.key.fromMe 
-        ? (botJid || from)
-        : (mek.key.participant || mek.key.remoteJid);
+      const sender = mek.key.fromMe ? botJid : (mek.key.participant || mek.key.remoteJid);
       const senderNumber = sender.split('@')[0];
       const pushname = mek.pushName || 'User';
 
@@ -264,11 +236,62 @@ async function connectToWA() {
       const isOwner = ownerNumber.includes(senderNumber) || isMe;
       const isSudo = MASTER_SUDO.includes(senderNumber);
 
-      // ================= ANTI DELETE & HOOKS =================
-      if (config.ANTI_DELETE && global.pluginHooks) {
+      // ================= PLUGIN HOOKS (Anti-Delete) =================
+      if (global.pluginHooks) {
         for (const plugin of global.pluginHooks) {
           if (plugin.onMessage) try { await plugin.onMessage(ranuxPro, mek); } catch {}
         }
+      }
+
+      // ================= STATUS HANDLER (FROM TEST BOT - STABLE) =================
+      if (mek.key.remoteJid === 'status@broadcast') {
+          const participant = mek.key.participant || mek.key.remoteJid;
+          
+          // 1. Auto Seen
+          if (config.AUTO_STATUS_SEEN) {
+              try { await ranuxPro.readMessages([mek.key]); } catch {}
+          }
+
+          // 2. Auto React
+          if (config.AUTO_STATUS_REACT) {
+              const emojis = ['❤️', '🔥', '😎', '💯', '🥰', '🌸', '🕊️', '✨'];
+              const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+              try {
+                  await ranuxPro.sendMessage(participant, {
+                      react: { text: randomEmoji, key: mek.key }
+                  });
+              } catch {}
+          }
+
+          // 3. Auto Forward (Split Logic from Test Bot)
+          if (config.AUTO_STATUS_FORWARD && botJid) {
+              // Text Status
+              if (mek.message?.extendedTextMessage && !mek.message.imageMessage && !mek.message.videoMessage) {
+                  const text = mek.message.extendedTextMessage.text || "";
+                  if (text.trim().length > 0) {
+                      await ranuxPro.sendMessage(botJid, {
+                          text: `📝 *Text Status*\n👤 From: @${participant.split("@")[0]}\n\n${text}`,
+                          mentions: [participant]
+                      });
+                  }
+              }
+              // Media Status
+              else if (mek.message?.imageMessage || mek.message?.videoMessage) {
+                  const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
+                  const mediaMsg = mek.message[msgType];
+                  const stream = await downloadContentFromMessage(mediaMsg, msgType === "imageMessage" ? "image" : "video");
+                  let buffer = Buffer.from([]);
+                  for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                  
+                  const caption = mediaMsg.caption || "";
+                  await ranuxPro.sendMessage(botJid, {
+                      [msgType === "imageMessage" ? "image" : "video"]: buffer,
+                      caption: `📥 *Forwarded Status*\n👤 From: @${participant.split("@")[0]}\n\n${caption}`,
+                      mentions: [participant]
+                  });
+              }
+          }
+          return;
       }
 
       // Mode Firewall
@@ -278,7 +301,6 @@ async function connectToWA() {
       if (mode === "private" && !isOwner && !isSudo) return;
 
       const m = sms(ranuxPro, mek);
-      
       const type = getContentType(mek.message);
       const body = type === 'conversation' ? mek.message.conversation
                  : type === 'extendedTextMessage' ? mek.message.extendedTextMessage.text
@@ -292,7 +314,6 @@ async function connectToWA() {
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(' ');
 
-      // Normal Reply (No Channel Forwarding)
       const reply = (text) => ranuxPro.sendMessage(from, { text }, { quoted: mek });
 
       // Group Metadata
@@ -312,37 +333,6 @@ async function connectToWA() {
                 isAdmins = groupAdmins.includes(sender);
             }
          } catch {}
-      }
-
-      // ================= STATUS FEATURES =================
-      if (mek.key.remoteJid === 'status@broadcast') {
-        if (config.AUTO_STATUS_SEEN) await ranuxPro.readMessages([mek.key]);
-        if (config.AUTO_STATUS_REACT) {
-          const emojis = ['🔥', '😎', '💜', '⚡', '💯'];
-          const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-          try {
-             await ranuxPro.sendMessage(mek.key.participant, { 
-                react: { text: randomEmoji, key: mek.key } 
-             });
-          } catch {}
-        }
-        
-        if (config.AUTO_STATUS_FORWARD && botJid) {
-            if (mek.message?.imageMessage || mek.message?.videoMessage) {
-              const msgType = mek.message.imageMessage ? "imageMessage" : "videoMessage";
-              const mediaMsg = mek.message[msgType];
-              const stream = await downloadContentFromMessage(mediaMsg, msgType === "imageMessage" ? "image" : "video");
-              let buffer = Buffer.from([]);
-              for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-              
-              await ranuxPro.sendMessage(botJid, {
-                [msgType === "imageMessage" ? "image" : "video"]: buffer,
-                caption: `📥 Forwarded Status from @${senderNumber}`,
-                mentions: [senderNumber + "@s.whatsapp.net"]
-              });
-            }
-        }
-        return;
       }
 
       // ================= EXECUTE COMMANDS =================
@@ -367,7 +357,7 @@ async function connectToWA() {
         }
       }
 
-      // ================= REPLY HANDLERS =================
+      // ================= REPLY HANDLERS (FROM TEST BOT - NUMBER REPLY) =================
       for (const handler of replyHandlers) {
         if (handler.filter && handler.filter(body, { sender, message: mek })) {
           try {
@@ -375,15 +365,14 @@ async function connectToWA() {
                from, body, sender, reply, args, q,
                isGroup, isAdmins, isOwner
              });
+             break; // Stop loop once handled (Standard practice)
           } catch (e) {
             console.error("Reply Handler Error:", e);
           }
         }
       }
 
-    } catch (err) {
-      console.error("Main Loop Error:", err);
-    }
+    } catch (err) {}
   });
 
   // ================= MESSAGE UPDATE/DELETE EVENTS =================
