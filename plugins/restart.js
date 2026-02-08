@@ -1,5 +1,3 @@
---- START OF FILE restart.js ---
-
 const config = require('../config');
 const { cmd, commands } = require('../command');
 const { sleep } = require('../lib/functions');
