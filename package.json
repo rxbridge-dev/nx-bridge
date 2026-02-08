@@ -39,6 +39,9 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "google-it": "^1.6.4",
-    "jimp": "^1.6.0"
+    "jimp": "^1.6.0",
+    "wa-sticker-formatter": "^4.4.4",
+    "qrcode": "^1.5.4",
+    "@vitalets/google-translate-api": "9.2.1"
   }
 }
