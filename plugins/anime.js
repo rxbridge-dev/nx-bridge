@@ -1,208 +1,215 @@
 const { cmd } = require("../command");
-const fetch = require("node-fetch");
+const axios = require("axios");
 
+// Design Elements
+const FOOTER = "> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ";
 
+// Helper: Get Data from API
 async function getJSON(url) {
-  try {
-    const res = await fetch(url);
-    return res.ok ? await res.json() : null;
-  } catch (e) {
-    console.error("API Fetch Error:", e);
-    return null;
-  }
+    try {
+        const res = await axios.get(url);
+        return res.data;
+    } catch (e) {
+        return null;
+    }
 }
 
-
+// ===============================================================
+// 🎴 RANDOM ANIME IMAGES (Waifu, Neko, etc.)
+// ===============================================================
 const waifuEndpoints = {
-  waifu: "https://api.waifu.pics/sfw/waifu",
-  husbando: "https://api.waifu.pics/sfw/husbando",
-  neko: "https://api.waifu.pics/sfw/neko",
-  animegirl: "https://api.waifu.pics/sfw/waifu",
-  animeboy: "https://api.waifu.pics/sfw/waifu",
-  kitsune: "https://api.waifu.pics/sfw/kitsune",
-  hentaigif: "https://api.waifu.pics/nsfw/waifu",
-  hentai: "https://api.waifu.pics/nsfw/neko"
+    waifu: "https://api.waifu.pics/sfw/waifu",
+    husbando: "https://api.waifu.pics/sfw/husbando",
+    neko: "https://api.waifu.pics/sfw/neko",
+    shinobu: "https://api.waifu.pics/sfw/shinobu",
+    megumin: "https://api.waifu.pics/sfw/megumin",
+    kitsune: "https://api.waifu.pics/sfw/kitsune"
 };
 
 for (const [cmdName, url] of Object.entries(waifuEndpoints)) {
-  cmd(
-    {
-      pattern: cmdName,
-      react: "🎴",
-      desc: `Send a random ${cmdName} image`,
-      category: "anime",
-      filename: __filename
-    },
-    async (danuwa, mek, m, { from, reply }) => {
-      const data = await getJSON(url);
-      if (!data || !data.url) return reply("❌ Failed to fetch image.");
-      await danuwa.sendMessage(
-        from,
-        { image: { url: data.url }, caption: `🎴 *${cmdName}*` },
-        { quoted: mek }
-      );
-    }
-  );
+    cmd({
+        pattern: cmdName,
+        react: "💮",
+        desc: `Get random ${cmdName} image`,
+        category: "anime",
+        filename: __filename
+    }, async (bot, mek, m, { from, reply }) => {
+        const data = await getJSON(url);
+        if (!data || !data.url) return reply("❌ *Failed to fetch image.*");
+
+        await bot.sendMessage(from, { 
+            image: { url: data.url }, 
+            caption: `╭───〔 ⛩️ *${cmdName.toUpperCase()}* 〕───┈\n│\n│ 🌸 *Category:* Anime Art\n│ 🔗 *Source:* WaifuPics\n│\n╰──────────────────────┈\n${FOOTER}`
+        }, { quoted: mek });
+    });
 }
 
-
-cmd(
-  {
+// ===============================================================
+// 📺 ANIME SEARCH (Jikan API v4)
+// ===============================================================
+cmd({
     pattern: "anime",
+    alias: ["anisearch"],
     react: "📺",
     desc: "Search anime details",
     category: "anime",
     filename: __filename
-  },
-  async (danuwa, mek, m, { from, q, reply }) => {
-    if (!q) return reply("❌ Provide anime name. Example: .anime Naruto");
-    const data = await getJSON(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&limit=1`);
-    if (!data || !data.data || data.data.length === 0) return reply("❌ Anime not found.");
-    const anime = data.data[0];
-    const text = `📺 *Title:* ${anime.title}\n📝 *Episodes:* ${anime.episodes || "?"}\n⭐ *Rating:* ${anime.score || "?"}\n🎭 *Genres:* ${anime.genres.map(g => g.name).join(", ")}`;
-    await danuwa.sendMessage(from, { text }, { quoted: mek });
-  }
-);
+}, async (bot, mek, m, { from, q, reply }) => {
+    if (!q) return reply("*ℹ️ Please provide an anime name.*\n*Example:* .anime Naruto");
 
-cmd(
-  {
+    try {
+        const data = await getJSON(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&limit=1`);
+        if (!data || !data.data || data.data.length === 0) return reply("❌ *Anime not found!*");
+
+        const anime = data.data[0];
+        let info = `
+╭───〔 ⛩️ *𝐀𝐍𝐈𝐌𝐄 𝐈𝐍𝐅𝐎* 〕───┈
+│
+│ 🏷️ *Title:* ${anime.title}
+│ 🇯🇵 *Japanese:* ${anime.title_japanese || "N/A"}
+│ 🎭 *Type:* ${anime.type || "N/A"}
+│ 📺 *Status:* ${anime.status || "N/A"}
+│ 📝 *Episodes:* ${anime.episodes || "?"}
+│ ⭐ *Rating:* ${anime.score || "?"}
+│ 🧬 *Genres:* ${anime.genres.map(g => g.name).join(", ")}
+│
+├─〔 📜 *𝐒𝐘𝐍𝐎𝐏𝐒𝐈𝐒* 〕───┈
+│
+│ ${anime.synopsis ? anime.synopsis.slice(0, 300) + "..." : "No synopsis available."}
+│
+╰──────────────────────┈
+${FOOTER}`;
+
+        await bot.sendMessage(from, { image: { url: anime.images.jpg.large_image_url }, caption: info }, { quoted: mek });
+
+    } catch (e) {
+        reply("❌ *Error fetching anime data.*");
+    }
+});
+
+// ===============================================================
+// 📖 MANGA SEARCH
+// ===============================================================
+cmd({
     pattern: "manga",
     react: "📖",
-    desc: "Search manga info",
+    desc: "Search manga details",
     category: "anime",
     filename: __filename
-  },
-  async (danuwa, mek, m, { from, q, reply }) => {
-    if (!q) return reply("❌ Provide manga name. Example: .manga One Piece");
-    const data = await getJSON(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(q)}&limit=1`);
-    if (!data || !data.data || data.data.length === 0) return reply("❌ Manga not found.");
-    const manga = data.data[0];
-    const text = `📖 *Title:* ${manga.title}\n📝 *Chapters:* ${manga.chapters || "?"}\n⭐ *Rating:* ${manga.score || "?"}\n🎭 *Genres:* ${manga.genres.map(g => g.name).join(", ")}`;
-    await danuwa.sendMessage(from, { text }, { quoted: mek });
-  }
-);
+}, async (bot, mek, m, { from, q, reply }) => {
+    if (!q) return reply("*ℹ️ Please provide a manga name.*");
 
-cmd(
-  {
+    try {
+        const data = await getJSON(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(q)}&limit=1`);
+        if (!data || !data.data || data.data.length === 0) return reply("❌ *Manga not found!*");
+
+        const manga = data.data[0];
+        let info = `
+╭───〔 📖 *𝐌𝐀𝐍𝐆𝐀 𝐈𝐍𝐅𝐎* 〕───┈
+│
+│ 🏷️ *Title:* ${manga.title}
+│ 📑 *Chapters:* ${manga.chapters || "?"}
+│ 📚 *Volumes:* ${manga.volumes || "?"}
+│ ⭐ *Rating:* ${manga.score || "?"}
+│ 🧬 *Genres:* ${manga.genres.map(g => g.name).join(", ")}
+│
+╰──────────────────────┈
+${FOOTER}`;
+
+        await bot.sendMessage(from, { image: { url: manga.images.jpg.large_image_url }, caption: info }, { quoted: mek });
+
+    } catch (e) {
+        reply("❌ *Error fetching manga data.*");
+    }
+});
+
+// ===============================================================
+// 👤 CHARACTER SEARCH
+// ===============================================================
+cmd({
     pattern: "character",
+    alias: ["anichar"],
     react: "👤",
-    desc: "Get anime character info",
+    desc: "Search anime character details",
     category: "anime",
     filename: __filename
-  },
-  async (danuwa, mek, m, { from, q, reply }) => {
-    if (!q) return reply("❌ Provide character name. Example: .character Naruto");
-    const data = await getJSON(`https://api.jikan.moe/v4/characters?q=${encodeURIComponent(q)}&limit=1`);
-    if (!data || !data.data || data.data.length === 0) return reply("❌ Character not found.");
-    const char = data.data[0];
-    const text = `👤 *Name:* ${char.name}\n💖 *Anime:* ${char.anime.map(a => a.anime.title).slice(0,5).join(", ")}`;
-    await danuwa.sendMessage(from, { text }, { quoted: mek });
-  }
-);
+}, async (bot, mek, m, { from, q, reply }) => {
+    if (!q) return reply("*ℹ️ Please provide a character name.*");
 
-cmd(
-  {
-    pattern: "quote",
+    try {
+        const data = await getJSON(`https://api.jikan.moe/v4/characters?q=${encodeURIComponent(q)}&limit=1`);
+        if (!data || !data.data || data.data.length === 0) return reply("❌ *Character not found!*");
+
+        const char = data.data[0];
+        let info = `
+╭───〔 👤 *𝐂𝐇𝐀𝐑𝐀𝐂𝐓𝐄𝐑* 〕───┈
+│
+│ 🏷️ *Name:* ${char.name}
+│ 🇯🇵 *Nicknames:* ${char.nicknames.join(", ") || "None"}
+│ 💖 *Anime:* ${char.anime.map(a => a.anime.title).slice(0, 3).join(", ")}
+│
+├─〔 📜 *𝐀𝐁𝐎𝐔𝐓* 〕───┈
+│
+│ ${char.about ? char.about.slice(0, 300) + "..." : "No info available."}
+│
+╰──────────────────────┈
+${FOOTER}`;
+
+        await bot.sendMessage(from, { image: { url: char.images.jpg.image_url }, caption: info }, { quoted: mek });
+
+    } catch (e) {
+        reply("❌ *Error fetching character data.*");
+    }
+});
+
+// ===============================================================
+// 🤔 ANIME QUOTE & FACTS
+// ===============================================================
+cmd({
+    pattern: "animequote",
     react: "💬",
-    desc: "Random anime quote",
+    desc: "Get a random anime quote",
     category: "anime",
     filename: __filename
-  },
-  async (danuwa, mek, m, { from, reply }) => {
-    const data = await getJSON("https://animechan.vercel.app/api/random");
-    if (!data || !data.quote) return reply("❌ Could not fetch quote.");
-    await danuwa.sendMessage(from, { text: `💬 "${data.quote}"\n- ${data.character} (${data.anime})` }, { quoted: mek });
-  }
-);
+}, async (bot, mek, m, { from, reply }) => {
+    // Note: AnimeChan API is often down, using a fallback method
+    try {
+        const data = await getJSON("https://animechan.xyz/api/random");
+        if (!data || !data.quote) return reply("❌ *Could not fetch quote right now.*");
 
+        let msg = `
+╭───〔 💬 *𝐀𝐍𝐈𝐌𝐄 𝐐𝐔𝐎𝐓𝐄* 〕───┈
+│
+│ 🎙️ *Character:* ${data.character}
+│ 📺 *Anime:* ${data.anime}
+│
+├─〔 📜 *𝐐𝐔𝐎𝐓𝐄* 〕───┈
+│
+│ "${data.quote}"
+│
+╰──────────────────────┈
+${FOOTER}`;
+        await reply(msg);
+    } catch (e) {
+        reply("❌ *API Error.*");
+    }
+});
 
-cmd(
-  {
-    pattern: "waifuquote",
-    react: "💌",
-    desc: "Quote from random waifu",
-    category: "anime",
-    filename: __filename
-  },
-  async (danuwa, mek, m, { from }) => {
-    const data = await getJSON("https://api.waifu.pics/sfw/waifu");
-    if (!data || !data.url) return reply("❌ Could not fetch waifu quote image.");
-    await danuwa.sendMessage(from, { image: { url: data.url }, caption: "💌 Waifu Quote" }, { quoted: mek });
-  }
-);
-
-cmd(
-  {
+cmd({
     pattern: "animefact",
-    react: "🤔",
+    react: "💡",
     desc: "Random anime fact",
     category: "anime",
     filename: __filename
-  },
-  async (danuwa, mek, m, { from }) => {
+}, async (bot, mek, m, { from }) => {
     const facts = [
-      "Naruto’s Naruto Ramen is based on a real Japanese dish.",
-      "Attack on Titan’s Titans were inspired by the author’s nightmares.",
-      "In One Piece, Luffy’s hat was inspired by a real straw hat."
+        "Naruto’s Naruto Ramen is based on a real Japanese dish.",
+        "Attack on Titan’s Titans were inspired by nightmares.",
+        "One Piece has been running for over 25 years.",
+        "Spirited Away was the first anime to win an Oscar.",
+        "Dragon Ball was inspired by the Chinese novel 'Journey to the West'.",
+        "Your Name is the highest-grossing anime film of all time."
     ];
     const fact = facts[Math.floor(Math.random() * facts.length)];
-    await danuwa.sendMessage(from, { text: `🤔 *Anime Fact:* ${fact}` }, { quoted: mek });
-  }
-);
-
-cmd(
-  {
-    pattern: "animequiz",
-    react: "❓",
-    desc: "Anime trivia question",
-    category: "anime",
-    filename: __filename
-  },
-  async (danuwa, mek, m, { from }) => {
-    const quiz = [
-      { q: "Who is the main character in Naruto?", a: "Naruto Uzumaki" },
-      { q: "In One Piece, what is Luffy’s dream?", a: "Become Pirate King" },
-      { q: "Which anime features Titans attacking humans?", a: "Attack on Titan" }
-    ];
-    const selected = quiz[Math.floor(Math.random() * quiz.length)];
-    await danuwa.sendMessage(from, { text: `❓ *Quiz:* ${selected.q}\n_Answer: ${selected.a}_` }, { quoted: mek });
-  }
-);
-
-cmd(
-  {
-    pattern: "aniroll",
-    react: "🎲",
-    desc: "Roll random anime GIF",
-    category: "anime",
-    filename: __filename
-  },
-  async (danuwa, mek, m, { from }) => {
-    const gifs = [
-      "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif",
-      "https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif",
-      "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif"
-    ];
-    const gif = gifs[Math.floor(Math.random() * gifs.length)];
-    await danuwa.sendMessage(from, { video: { url: gif }, caption: "🎲 Anime Roll" }, { quoted: mek });
-  }
-);
-
-cmd(
-  {
-    pattern: "anigame",
-    react: "🎮",
-    desc: "Guess this anime character game",
-    category: "anime",
-    filename: __filename
-  },
-  async (danuwa, mek, m, { from }) => {
-    const game = [
-      { name: "Naruto Uzumaki", url: "https://i.imgur.com/3a7P7zC.png" },
-      { name: "Luffy", url: "https://i.imgur.com/BxQs5It.png" },
-      { name: "Goku", url: "https://i.imgur.com/0M3d3yI.png" }
-    ];
-    const selected = game[Math.floor(Math.random() * game.length)];
-    await danuwa.sendMessage(from, { image: { url: selected.url }, caption: "🎮 Guess this character!" }, { quoted: mek });
-  }
-);
+    await bot.sendMessage(from, { text: `╭───〔 💡 *𝐀𝐍𝐈𝐌𝐄 𝐅𝐀𝐂𝐓* 〕───┈\n│\n│ ◈ ${fact}\n│\n╰──────────────────────┈\n${FOOTER}` }, { quoted: mek });
+});
