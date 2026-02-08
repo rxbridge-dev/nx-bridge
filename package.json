@@ -1,7 +1,7 @@
 {
   "name": "king-ranux-md",
   "version": "1.0.0",
-  "description": "👑 King RANUX Pro — A powerful, fast & stable WhatsApp automation bot | Made by MR. Ransara Devnath",
+  "description": "👑 King RANUX Pro WhatsApp Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -36,10 +36,8 @@
     "sadaslk-dlcore": "^1.0.0",
     "abir-photo360-apis": "^1.0.2",
     "puppeteer": "^24.35.0",
-    "cheerio": "^1.2.0",
-    "fs-extra": "^11.3.3",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2 ",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "google-it": "^1.6.4",
     "jimp": "^1.6.0"
   }
