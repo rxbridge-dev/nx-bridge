@@ -1,18 +1,44 @@
-// core/config.js
-// This file always loads the user's config from the USER repo
+/**
+ * 👑 King RANUX PRO – User Configuration (cleaned)
+ */
 
-const path = require('path');
+module.exports = {
 
-const userConfigPath = process.env.USER_CONFIG
-  ? process.env.USER_CONFIG
-  : path.join(__dirname, '../config');
+  // 🔐 WhatsApp Session ID (leave empty when using DB-based sessions)
+  // If you still want to use a single legacy SESSION_ID, you can set it via
+  // environment variable `SESSION_ID` or paste a base64 session string here.
+  SESSION_ID: process.env.SESSION_ID || "𝐊𝐢𝐧𝐠 𝐑𝐀𝐍𝐔𝐗 ᴾʳᵒ ~eyJub2lzZUtleSI6eyJwcml2YXRlIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoib0ZTRmtkdDlmTVBnT0FteENVMjdiN2NQYjBqY3NoOHFhZTdXd0dld2dsUT0ifSwicHVibGljIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiNUQva0NOL2h2cDhob0dtT2pLZmxTSG8vMWNPbmNRVndXUmhoTlN6cVJsUT0ifX0sInBhaXJpbmdFcGhlbWVyYWxLZXlQYWlyIjp7InByaXZhdGUiOnsidHlwZSI6IkJ1ZmZlciIsImRhdGEiOiJDQzlZQU1BM25FU29ndmtPZDl1N0I0cnNkbW1mYmdvVkVaMlloM1lGdzBFPSJ9LCJwdWJsaWMiOnsidHlwZSI6IkJ1ZmZlciIsImRhdGEiOiJpNWFvS0crWEI1UkVNbmhqUVpxd3dxMlU0MHhwbm1Hak5MUkVCWEhYdDBNPSJ9fSwic2lnbmVkSWRlbnRpdHlLZXkiOnsicHJpdmF0ZSI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6InlMOTBFTWp2OWVGUFZKSUlLZVQvNUVOQk12WUlUR1J0RERFVHBwRWljMFk9In0sInB1YmxpYyI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IkVOTlNTTndrVXA5ckM3cnhFbS9XZmMzZnZlS0g4RjBJZWthV0ZVNTM0aTQ9In19LCJzaWduZWRQcmVLZXkiOnsia2V5UGFpciI6eyJwcml2YXRlIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiYUIyRHptV2l6MUpodElQRXJ4ajZBZzhZbGRCbEpTRWtZZ2VzTGxJRVcxRT0ifSwicHVibGljIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiT2NnSUY1RldBK2tOZzlpQThiOGNOUDR6cTcxY3lxOGZHbDJUWnNFMW9TUT0ifX0sInNpZ25hdHVyZSI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6InQrbGVPY0QwellYZUJPK01zQ2dQbnl4WUlZSDFWbjIxTzFQY3VIRlpPWVZpMzZEZ250U3Y1V0h4Mmx0dUlNbVovcERwejRYM0ROMk1Tdm9BTFNuN2lBPT0ifSwia2V5SWQiOjF9LCJyZWdpc3RyYXRpb25JZCI6MTExLCJhZHZTZWNyZXRLZXkiOiIzSWNVZDVVTlBiUno4TElEUVdmeXhjaHdJTTZUL1h1NTNvcngwYkVtTDY0PSIsInByb2Nlc3NlZEhpc3RvcnlNZXNzYWdlcyI6W3sia2V5Ijp7InJlbW90ZUppZCI6Ijk0NzI2ODgwNzg0QHMud2hhdHNhcHAubmV0IiwiZnJvbU1lIjpmYWxzZSwiaWQiOiJBNUM5NjQxMENBNEU3NzQ1NkRBMUZFMjdCMjM3RUNFMCIsInBhcnRpY2lwYW50IjoiIiwiYWRkcmVzc2luZ01vZGUiOiJwbiJ9LCJtZXNzYWdlVGltZXN0YW1wIjoxNzcwOTA2MjAwfSx7ImtleSI6eyJyZW1vdGVKaWQiOiI5NDcyNjg4MDc4NEBzLndoYXRzYXBwLm5ldCIsImZyb21NZSI6ZmFsc2UsImlkIjoiQTU1NkFDQzBBQTE5QjU2MzZCNDY2MDZFNTJFNUFBRTciLCJwYXJ0aWNpcGFudCI6IiIsImFkZHJlc3NpbmdNb2RlIjoicG4ifSwibWVzc2FnZVRpbWVzdGFtcCI6MTc3MDkwNjIwMn0seyJrZXkiOnsicmVtb3RlSmlkIjoiOTQ3MjY4ODA3ODRAcy53aGF0c2FwcC5uZXQiLCJmcm9tTWUiOmZhbHNlLCJpZCI6IkE1Q0EzQUI3RjA5RUYxMDk1NURGODU0NjQ3NUU3ODc1IiwicGFydGljaXBhbnQiOiIiLCJhZGRyZXNzaW5nTW9kZSI6InBuIn0sIm1lc3NhZ2VUaW1lc3RhbXAiOjE3NzA5MDYyMDJ9LHsia2V5Ijp7InJlbW90ZUppZCI6Ijk0NzI2ODgwNzg0QHMud2hhdHNhcHAubmV0IiwiZnJvbU1lIjpmYWxzZSwiaWQiOiJBNTYxRDc0RDkzOEUxQURGRkRGMkJEN0U4QzFEMDNBMyIsInBhcnRpY2lwYW50IjoiIiwiYWRkcmVzc2luZ01vZGUiOiJwbiJ9LCJtZXNzYWdlVGltZXN0YW1wIjoxNzcwOTA2MjAyfSx7ImtleSI6eyJyZW1vdGVKaWQiOiI5NDcyNjg4MDc4NEBzLndoYXRzYXBwLm5ldCIsImZyb21NZSI6ZmFsc2UsImlkIjoiQTU1RjA2NzREMkU4RjQ2NzY2RkEyRTNBQTBDQzM1N0QiLCJwYXJ0aWNpcGFudCI6IiIsImFkZHJlc3NpbmdNb2RlIjoicG4ifSwibWVzc2FnZVRpbWVzdGFtcCI6MTc3MDkwNjIwM30seyJrZXkiOnsicmVtb3RlSmlkIjoiOTQ3MjY4ODA3ODRAcy53aGF0c2FwcC5uZXQiLCJmcm9tTWUiOmZhbHNlLCJpZCI6IkE1RDM1Q0M5NzI3MUJENUI2NTk5NUI2NzY0QUIyQ0RCIiwicGFydGljaXBhbnQiOiIiLCJhZGRyZXNzaW5nTW9kZSI6InBuIn0sIm1lc3NhZ2VUaW1lc3RhbXAiOjE3NzA5MDYyMDV9XSwibmV4dFByZUtleUlkIjo4MTMsImZpcnN0VW51cGxvYWRlZFByZUtleUlkIjo4MTMsImFjY291bnRTeW5jQ291bnRlciI6MSwiYWNjb3VudFNldHRpbmdzIjp7InVuYXJjaGl2ZUNoYXRzIjpmYWxzZX0sInJlZ2lzdGVyZWQiOnRydWUsInBhaXJpbmdDb2RlIjoiMllaUzJUV1MiLCJtZSI6eyJpZCI6Ijk0NzI2ODgwNzg0OjY3QHMud2hhdHNhcHAubmV0IiwibmFtZSI6IvCdk5zwnZOhLiDwnZOh8J2TqvCdk7fwnZO88J2TqvCdk7vwnZOqIPCdk5PwnZOu8J2Tv/Cdk7fwnZOq8J2TvfCdk7EiLCJsaWQiOiIyNDk0ODIxMzQ0NDIxNjQ6NjdAbGlkIn0sImFjY291bnQiOnsiZGV0YWlscyI6IkNJajJ4YjhCRU5IRXQ4d0dHQUlnQUNnQSIsImFjY291bnRTaWduYXR1cmVLZXkiOiJYSmFUaHJQUFo0SXNnSHBpT0FKcTE0bHFESlIrVXFEMkxNYjVRd01FNWlRPSIsImFjY291bnRTaWduYXR1cmUiOiI4ejJTS0NjRE1wWFlsWG5HakZlMDJVZExtREpXWXhwNlg1ZENVUVlkckx5cDhiWEM5dCtaVzdYeGNwT1JqR0MwcmJLUGw5RnllQVJtUzVGS1IyTVpDUT09IiwiZGV2aWNlU2lnbmF0dXJlIjoiNU9EVkhVd1VjblFiS1ZWQysvVy9yYWFtMStHWWNRam56L2pIQXFmTmpnbEx5R1JrUjZjdXYvbklLLzVYYUFXM2p1d24yTndJQWtnSWJOSkkrSWluaXc9PSJ9LCJzaWduYWxJZGVudGl0aWVzIjpbeyJpZGVudGlmaWVyIjp7Im5hbWUiOiIyNDk0ODIxMzQ0NDIxNjQ6NjdAbGlkIiwiZGV2aWNlSWQiOjB9LCJpZGVudGlmaWVyS2V5Ijp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiQlZ5V2s0YXp6MmVDTElCNllqZ0NhdGVKYWd5VWZsS2c5aXpHK1VNREJPWWsifX1dLCJwbGF0Zm9ybSI6InNtYmEiLCJyb3V0aW5nSW5mbyI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IkNBVUlFZ2dDIn0sImxhc3RBY2NvdW50U3luY1RpbWVzdGFtcCI6MTc3MDkwNjE5NywibXlBcHBTdGF0ZUtleUlkIjoiQUFBQUFPYTkiLCJsYXN0UHJvcEhhc2giOiIxSzRoSDQifQ==",
 
-try {
-  module.exports = require(userConfigPath);
-  console.log('✅ User config loaded from:', userConfigPath);
-} catch (err) {
-  console.error('❌ Failed to load user config!');
-  console.error('Expected path:', userConfigPath);
-  console.error(err);
-  process.exit(1);
-}
+  // ===============================
+  // 🤖 BOT MODE SYSTEM
+  // public  = groups + inbox
+  // group   = groups only
+  // inbox   = inbox only
+  // private = owner + sudo only
+  // ===============================
+  MODE: process.env.MODE || "public",
+
+  // ===============================
+  // 📌 STATUS AUTOMATION
+  // ===============================
+  AUTO_STATUS_SEEN: true,
+  AUTO_STATUS_REACT: false,
+  AUTO_STATUS_FORWARD: false,
+
+  // ===============================
+  // 🛡️ ANTI DELETE
+  // ===============================
+  ANTI_DELETE: true,
+
+  // ===============================
+  // ⚙️ GENERAL
+  // ===============================
+  PREFIX: process.env.PREFIX || ",",
+
+  // ===============================
+  // 🎬 MOVIE PLUGIN FOOTER
+  // ===============================
+  MOVIE_FOOTER_TEXT: "𝓜𝓡. 𝓡𝓪𝓷𝓼𝓪𝓻𝓪 𝓓𝓮𝓿𝓷𝓪𝓽𝓱",
+  
+  BOT_OWNER: '94726880784',
+};
