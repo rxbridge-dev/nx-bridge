@@ -1,24 +1,51 @@
+/**
+ * ------------------------------------------------------------
+ * KING RANUX PRO BOT — ANIME SCRAPER MODULE
+ * Version: v1.0.0
+ * ------------------------------------------------------------
+ *
+ * Copyright (c) 2026 A.M. Ransara Devnath
+ * All Rights Reserved.
+ *
+ * This module is a FREE scraper component designed for
+ * KING RANUX PRO WhatsApp Bot.
+ *
+ * Redistribution, resale, or commercial distribution of this
+ * scraper module (in original or modified form) is prohibited.
+ *
+ * Allowed:
+ *  - Personal use
+ *  - Private bot deployments
+ *  - UI text customization
+ *  - Branding text changes
+ *
+ * Not Allowed:
+ *  - Selling this scraper
+ *  - Re-uploading to public repositories
+ *  - Modifying core scraper logic
+ *  - Modifying downloader logic
+ *
+ * Always use the latest version of this module.
+ *
+ * Author  : A.M. Ransara Devnath
+ * Project : KING RANUX PRO BOT
+ * Contact : +94 72 688 0784
+ * ------------------------------------------------------------
+ */
+ 
 const { cmd } = require("../command");
 const puppeteer = require("puppeteer");
 const fs = require("fs-extra");
 const path = require("path");
 const config = require("../config");
 
-// ✅ CORRECT IMPORT: Using the Stream Downloader Package
 const { GoogleDriveDownloader } = require('@raphaelvserafim/google-drive-downloader');
 
-// ===============================================================
-// ⚙️ GLOBAL STATE & CONFIG
-// ===============================================================
 global.pendingAnime = global.pendingAnime || {};
 
 const SITE_URL = "https://animeclub2.com";
 const LOGO_URL = "https://raw.githubusercontent.com/ransara-devnath-ofc/-Bot-Accent-/refs/heads/main/King%20RANUX%20PRO%20Bot%20Images/king-ranux-pro-main-logo.png";
 const FOOTER = "> 👑 ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋɪɴɢ ʀᴀɴᴜx ᴘʀᴏ";
-
-// ===============================================================
-// 📥 DOWNLOAD & SEND FUNCTION (STREAMING LARGE FILES)
-// ===============================================================
 
 async function downloadAndSend(conn, from, url, fileName, mek) {
     try {
@@ -26,7 +53,6 @@ async function downloadAndSend(conn, from, url, fileName, mek) {
 
         console.log(`[AnimeTV] Processing URL: ${url}`);
 
-        // 1. Prepare Paths & Filename
         let finalFileName = fileName.replace(/[^\w\s.-]/gi, '').trim(); 
         if (!finalFileName.endsWith(".mp4") && !finalFileName.endsWith(".mkv")) finalFileName += ".mp4";
 
@@ -34,11 +60,8 @@ async function downloadAndSend(conn, from, url, fileName, mek) {
         await fs.ensureDir(tempDir);
         const destinationPath = path.join(tempDir, finalFileName);
 
-        // 2. Initialize Downloader Class
         const downloader = new GoogleDriveDownloader();
 
-        // 3. Start Stream Download
-        // This method automatically handles the "Download Anyway" virus warning
         console.log("[AnimeTV] Starting Download Stream...");
         
         const result = await downloader.downloadAsStream(url);
@@ -47,10 +70,8 @@ async function downloadAndSend(conn, from, url, fileName, mek) {
             
             const writeStream = fs.createWriteStream(destinationPath);
             
-            // Pipe the download stream to the file system
             result.file.stream.pipe(writeStream);
 
-            // Wait for download to finish
             await new Promise((resolve, reject) => {
                 writeStream.on('finish', () => {
                     console.log('✅ Large file downloaded successfully!');
@@ -66,42 +87,32 @@ async function downloadAndSend(conn, from, url, fileName, mek) {
             throw new Error("Failed to establish download stream. Link might be private, broken, or not a valid Drive link.");
         }
 
-        // 4. Check File Size (WhatsApp Limit ~2GB)
         const stats = await fs.stat(destinationPath);
         const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 
         if (sizeMB > 2000) {
-            await fs.unlink(destinationPath); // Delete if too big
+            await fs.unlink(destinationPath);
             return conn.sendMessage(from, { 
                 text: `⚠️ *File Too Large!* (${sizeMB}MB)\nWhatsApp upload limit is 2GB.\n\n🔗 *Link:* ${url}` 
             }, { quoted: mek });
         }
 
-        // 5. Upload to WhatsApp
         await conn.sendMessage(from, { react: { text: "⬆️", key: mek.key } });
 
         await conn.sendMessage(from, {
             document: { url: destinationPath },
             mimetype: "video/mp4",
             fileName: finalFileName,
-            caption: `╭───〔 ✅ *𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃 𝐂𝐎𝐌𝐏𝐋𝐄𝐓𝐄* 〕───┈
-│
-│ 🎬 *File:* ${finalFileName}
-│ 📦 *Size:* ${sizeMB} MB
-│ ⚡ *Type:* Google Drive Stream
-│
-╰──────────────────────┈
-${FOOTER}`
+            caption: `╭───〔 ✅ *𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃* 〕───┈\n│\n│ 🎬 *File:* ${finalFileName}\n│ 📦 *Size:* ${sizeMB} MB\n│\n╰──────────────────────┈\n${FOOTER}`
         }, { quoted: mek });
 
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
-        // 6. Cleanup Temp File
         setTimeout(() => { 
             if (fs.existsSync(destinationPath)) {
                 fs.unlinkSync(destinationPath); 
             }
-        }, 60000); // Cleanup after 1 minute
+        }, 60000); 
 
     } catch (e) {
         console.error("[AnimeTV] Error:", e);
@@ -111,9 +122,6 @@ ${FOOTER}`
     }
 }
 
-// ===============================================================
-// 🕷️ PUPPETEER SCRAPING FUNCTIONS
-// ===============================================================
 
 async function searchAnime(query) {
     const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox", "--disable-setuid-sandbox"] });
@@ -189,11 +197,7 @@ async function bypassLink(url) {
     return finalLink;
 }
 
-// ===============================================================
-// 🤖 COMMAND FLOW (UI REVAMPED)
-// ===============================================================
 
-// 1. Search
 cmd({
     pattern: "anime",
     alias: ["ac", "animeclub"],
@@ -220,7 +224,6 @@ cmd({
     } catch (e) { console.error(e); reply("❌ Search Error."); }
 });
 
-// 2. Episodes
 cmd({
     filter: (text, { sender }) => global.pendingAnime[sender]?.step === "SELECT_ANIME" && /^\d+$/.test(text)
 }, async (conn, mek, m, { body, sender, reply, from }) => {
@@ -243,7 +246,6 @@ cmd({
     } catch (e) { console.error(e); reply("❌ Error getting episodes."); }
 });
 
-// 3. Quality Selection (UI UPGRADED AS REQUESTED) 🌸✨
 cmd({
     filter: (text, { sender }) => global.pendingAnime[sender]?.step === "SELECT_EPISODE" && /^\d+$/.test(text)
 }, async (conn, mek, m, { body, sender, reply, from }) => {
@@ -259,28 +261,17 @@ cmd({
 
         global.pendingAnime[sender] = { step: "SELECT_QUALITY", links, epName: selectedEp.title };
 
-        // ✨ NEW BEAUTIFUL UI FOR QUALITY SELECTION ✨
-        let msg = `╭───〔 🌸 *𝐐𝐔𝐀𝐋𝐈𝐓𝐘 𝐒𝐄𝐋𝐄𝐂𝐓𝐈𝐎𝐍* 🌸 〕───┈\n│\n`;
-        msg += `│ 🎬 *𝐄𝐩𝐢𝐬𝐨𝐝𝐞:* ${selectedEp.title}\n│\n`;
-
+        let msg = `╭───〔 ⬇️ *𝐒𝐄𝐋𝐄𝐂𝐓 𝐐𝐔𝐀𝐋𝐈𝐓𝐘* 〕───┈\n│\n│ 🎬 *Episode:* ${selectedEp.title}\n│\n`;
         links.forEach((link, i) => {
-            // Determine type and emoji
-            let isTelegram = link.serverName.toLowerCase().includes("telegram");
-            let icon = isTelegram ? "🛰️" : "📁";
-            let name = isTelegram ? "𝐓𝐞𝐥𝐞𝐠𝐫𝐚𝐦" : "𝐆-𝐃𝐫𝐢𝐯𝐞";
-            let quality = link.quality ? `[ ${link.quality} ]` : "[ Unknown ]";
-
-            msg += `│ *${i + 1}* ➻ ${icon} ${name}   ${quality}\n`;
+            let type = link.serverName.toLowerCase().includes("telegram") ? "✈️ TG" : "🛑 Drive";
+            msg += `│ *${i + 1}* ➻ ${type} [${link.quality}]\n`;
         });
-        
-        msg += `│\n╰──────────────────────┈\n│ 🔢 *Reply with a number!*`;
+        msg += `│\n╰──────────────────────┈\n│ 🔢 *Reply with number!*`;
 
         await conn.sendMessage(from, { text: msg }, { quoted: mek });
-
     } catch (e) { console.error(e); reply("❌ Error getting links."); }
 });
 
-// 4. Download
 cmd({
     filter: (text, { sender }) => global.pendingAnime[sender]?.step === "SELECT_QUALITY" && /^\d+$/.test(text)
 }, async (conn, mek, m, { body, sender, reply, from }) => {
@@ -291,11 +282,8 @@ cmd({
     const selectedLink = links[index];
     delete global.pendingAnime[sender];
 
-    // Telegram Handling
     if (selectedLink.serverName.toLowerCase().includes("telegram")) {
-        return conn.sendMessage(from, { 
-            text: `╭───〔 🛰️ 𝐓𝐄𝐋𝐄𝐆𝐑𝐀𝐌 𝐋𝐈𝐍𝐊 〕───┈\n│\n│ ⚠️ Cannot Auto-Download Telegram Files.\n│\n│ 🔗 *Link:* ${selectedLink.serverUrl}\n│\n╰──────────────────────┈` 
-        }, { quoted: mek });
+        return conn.sendMessage(from, { text: `✈️ *Telegram Link*\n\n🔗 ${selectedLink.serverUrl}` }, { quoted: mek });
     }
 
     await reply(`*🚀 Bypassing countdown for "${epName}"...*`);
@@ -304,7 +292,6 @@ cmd({
         const finalUrl = await bypassLink(selectedLink.serverUrl);
         if (!finalUrl) return reply("❌ *Failed to generate link.*");
 
-        // ✅ Using the NPM Package Stream Logic Here
         if (finalUrl.includes("drive.google.com")) {
             await downloadAndSend(conn, from, finalUrl, `${epName} - ${selectedLink.quality}`, mek);
         } else {
@@ -315,3 +302,19 @@ cmd({
         reply("❌ *Error processing download.*");
     }
 });
+
+/**
+ * ------------------------------------------------------------
+ * END OF ANIME SCRAPER MODULE
+ * KING RANUX PRO BOT
+ * ------------------------------------------------------------
+ *
+ * AnimeClub Scraper + Google Drive Downloader
+ * Developed by A.M. Ransara Devnath
+ *
+ * Module Version : v1.0.0
+ * Year           : 2026
+ *
+ * Thank you for using KING RANUX PRO modules.
+ * ------------------------------------------------------------
+ */
